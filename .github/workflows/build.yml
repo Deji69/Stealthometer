@@ -1,0 +1,117 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - master
+  release:
+    types: [ created ]
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+
+jobs:
+  build:
+    name: Build
+    runs-on: [ windows-latest ]
+
+    steps:
+    - name: Get latest CMake and ninja
+      uses: lukka/get-cmake@latest
+
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        submodules: recursive
+
+    - name: Setup VS environment
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
+
+    - name: Build and install debug
+      run: |
+        cmake --preset x64-Debug .
+        cmake --build _build/x64-Debug --parallel
+        cmake --install _build/x64-Debug
+
+    - name: Build and install release
+      run: |
+        cmake --preset x64-Release .
+        cmake --build _build/x64-Release --parallel
+        cmake --install _build/x64-Release
+
+    - name: Copy debug artifacts
+      run: |
+        mkdir _dist-debug
+        Copy-Item _install/x64-Debug/bin/* -Destination _dist-debug/ -Recurse
+        Copy-Item LICENSE -Destination _dist-debug/LICENSE
+
+    - name: Copy release artifacts
+      run: |
+        mkdir _dist-release
+        Copy-Item _install/x64-Release/bin/* -Destination _dist-release/ -Recurse
+        Copy-Item LICENSE -Destination _dist-release/LICENSE
+
+    - name: Archive debug
+      uses: actions/upload-artifact@v2
+      with:
+        name: MyMod-Debug
+        path: _dist-debug/*
+
+    - name: Archive release
+      uses: actions/upload-artifact@v2
+      with:
+        name: MyMod-Release
+        path: _dist-release/*
+
+  upload_release:
+    name: Upload release artifacts
+    needs: build
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Download debug artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: MyMod-Debug
+        path: MyMod-Debug
+
+    - name: Download release artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: MyMod-Release
+        path: MyMod-Release
+
+    - name: Archive artifact files
+      run: |
+        cd MyMod-Debug
+        zip -r MyMod-Debug.zip *
+        cd ../MyMod-Release
+        zip -r MyMod-Release.zip *
+        
+    - name: Get release
+      id: get_release
+      uses: bruceadams/get-release@v1.2.2
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+
+    - name: Upload debug assets
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.get_release.outputs.upload_url }}
+        asset_path: MyMod-Debug/MyMod-Debug.zip
+        asset_name: MyMod-Debug.zip
+        asset_content_type: application/zip
+
+    - name: Upload release assets
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.get_release.outputs.upload_url }}
+        asset_path: MyMod-Release/MyMod-Release.zip
+        asset_name: MyMod-Release.zip
+        asset_content_type: application/zip
