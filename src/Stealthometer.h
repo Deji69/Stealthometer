@@ -1,22 +1,51 @@
 #pragma once
-
+#include <vector>
 #include <IPluginInterface.h>
+#include <Glacier/ZEntity.h>
+#include <Glacier/ZInput.h>
+#include "Stats.h"
+#include "StatWindow.h"
 
-#include <Glacier/SGameUpdateEvent.h>
+struct ActorKnowledgeData
+{
+	bool isWitness = false;
+	int highestTensionLevel = 0;
+	ECompiledBehaviorType lastFrameBehaviour;
+};
 
-class Stealthometer : public IPluginInterface {
+enum class StealthometerPlaystyle
+{
+};
+
+class Stealthometer : public IPluginInterface
+{
 public:
-    void OnEngineInitialized() override;
-    ~Stealthometer() override;
-    void OnDrawMenu() override;
-    void OnDrawUI(bool p_HasFocus) override;
+	Stealthometer();
+	~Stealthometer();
+
+	auto Init() -> void override;
+	auto OnEngineInitialized() -> void override;
+	auto OnDrawUI(bool hasFocus) -> void override;
+	auto OnFrameUpdate(const SGameUpdateEvent&) -> void;
+	auto OnDrawMenu() -> void override;
+
+	auto NewContract() -> void;
+	auto UpdateDisplayStats() -> void;
+	auto CalculateStealthRating() -> double;
 
 private:
-    void OnFrameUpdate(const SGameUpdateEvent& p_UpdateEvent);
-    DECLARE_PLUGIN_DETOUR(Stealthometer, void, OnLoadScene, ZEntitySceneContext* th, ZSceneData& p_SceneData);
+	//DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZGameStatsManager_SendAISignals, ZGameStatsManager* th);
+	//DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZKnowledge_SetGameTension, ZKnowledge* knowledge, EGameTension tension);
+	DECLARE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent, ZAchievementManagerSimple* th, uint32_t eventIndex, const ZDynamicObject& ev);
 
 private:
-    bool m_ShowMessage = false;
+	SRWLOCK eventLock = {};
+	Stats stats;
+	DisplayStats displayStats;
+	StatWindow window;
+	std::array<ActorKnowledgeData, 1000> actorData;
+	std::vector<std::string> eventHistory;
+	bool statVisibleUI = false;
 };
 
 DEFINE_ZHM_PLUGIN(Stealthometer)

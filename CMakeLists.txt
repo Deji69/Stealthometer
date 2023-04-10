@@ -11,16 +11,16 @@ set(CMAKE_CXX_STANDARD 23)
 
 # Create the Stealthometer mod library.
 add_library(Stealthometer SHARED
-    src/Stealthometer.cpp
-    src/Stealthometer.h
-)
+	src/Stealthometer.cpp
+	src/Stealthometer.h
+ "src/Stats.h" "src/StatWindow.h" "src/StatWindow.cpp" "src/FixMinMax.h")
 
 target_link_libraries(Stealthometer
-    ZHMModSDK
+	ZHMModSDK
 )
 
 install(TARGETS Stealthometer
-    RUNTIME DESTINATION bin
+	RUNTIME DESTINATION bin
 )
 
 # Install the mod to the game folder when the `GAME_INSTALL_PATH` variable is set.
