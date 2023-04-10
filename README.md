@@ -1,12 +1,12 @@
-# MyMod
+# Stealthometer
 
-This is MyMod, a mod for Hitman 3!
+This is Stealthometer, a mod for Hitman 3!
 
 ## Installation Instructions
 
 1. Download the latest version of [ZHMModSDK](https://github.com/OrfeasZ/ZHMModSDK) and install it.
-2. Download the latest version of `MyMod` and copy it to the ZHMModSDK `mods` folder (e.g. `C:\Games\HITMAN 3\Retail\mods`).
-3. Run the game and once in the main menu, press the `~` key (`^` on QWERTZ layouts) and enable `MyMod` from the menu at the top of the screen (you may need to restart your game afterwards).
+2. Download the latest version of `Stealthometer` and copy it to the ZHMModSDK `mods` folder (e.g. `C:\Games\HITMAN 3\Retail\mods`).
+3. Run the game and once in the main menu, press the `~` key (`^` on QWERTZ layouts) and enable `Stealthometer` from the menu at the top of the screen (you may need to restart your game afterwards).
 4. Enjoy!
 
 ## Building
