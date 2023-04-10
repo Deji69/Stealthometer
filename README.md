@@ -1,6 +1,6 @@
 # Stealthometer
 
-The Stealthometer is a tool providing real-time statistics tracking for Hitman 3, taking inspiration from [HitmanStatisticsUber](https://github.com/nvillemin/HitmanStatistics) and [Statman](https://github.com/OrfeasZ/Statman/tree/master/Statman) for older Hitman entries.
+The Stealthometer is a tool providing real-time statistics tracking for Hitman 3, taking inspiration from [HitmanStatistics](https://github.com/nvillemin/HitmanStatistics) and [Statman](https://github.com/OrfeasZ/Statman/tree/master/Statman) for older Hitman entries.
 The statistics can be displayed in their own window and has dark mode support, ideal live streaming gameplay via window capture.
 
 While Hitman 3 has a built-in Silent Assassin tracker already, Stealthometer provides a lot more insight, such as featuring an exact count of bodies found, which can aid development of gameplay strategies by providing details that the game's SA indicator may not.
