@@ -327,7 +327,7 @@ auto Stealthometer::OnFrameUpdate(const SGameUpdateEvent& ev) -> void
 
 			auto tension = getBehaviourTension(behaviourType);
 
-			Logger::Info("{}: {}", behaviourToString(behaviourType), tension);
+			Logger::Debug("{}: {}", behaviourToString(behaviourType), tension);
 
 			if (!tension) continue;
 
@@ -353,12 +353,19 @@ auto Stealthometer::OnDrawUI(bool) -> void
 	if (!this->statVisibleUI) return;
 
 	ImGui::PushFont(SDK()->GetImGuiBlackFont());
-	const auto s_WindowExpanded = ImGui::Begin(ICON_MD_PIE_CHART " STEALTH RATINGS", nullptr);
+	const auto s_WindowExpanded = ImGui::Begin(ICON_MD_PIE_CHART " STEALTHOMETER", nullptr);
 	ImGui::PushFont(SDK()->GetImGuiRegularFont());
 
 	if (s_WindowExpanded)
 	{
-		ImGui::BeginTable("RatingTable", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_ScrollY);
+		if (ImGui::Checkbox("External Window", &this->externalWindowEnabled)) {
+			if (this->externalWindowEnabled)
+				this->window.create(hInstance);
+			else
+				this->window.destroy();
+		}
+
+		/*ImGui::BeginTable("RatingTable", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_ScrollY);
 
 		AcquireSRWLockShared(&this->eventLock);
 
@@ -373,7 +380,7 @@ auto Stealthometer::OnDrawUI(bool) -> void
 
 		ReleaseSRWLockShared(&this->eventLock);
 
-		ImGui::EndTable();
+		ImGui::EndTable();*/
 	}
 
 	ImGui::PopFont();
@@ -565,7 +572,7 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 		}
 		else if (eventName == "SetupTarget")
 		{
-			Logger::Info("SetupTarget: {}", s_EventData);
+			Logger::Debug("SetupTarget: {}", s_EventData);
 		}
 		else if (eventName == "setpieces")
 		{
@@ -597,7 +604,7 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 			// {"Timestamp":10.864028,"Name":"setpieces","ContractSessionId":"2517213274420850852-356e1881-82f8-4c5a-b7f1-63ab8432c042","ContractId":"00000000-0000-0000-0000-000000000200","Value":{"RepositoryId":"2d7a91b9-1b3a-4db3-a8bf-6249db70c339","name_metricvalue":"NotAvailable","setpieceHelper_metricvalue":"SuspendedObject","setpieceType_metricvalue":"trap","toolUsed_metricvalue":"NA","Item_triggered_metricvalue":"NA","Position":"ZDynamicObject::ToString() unknown type: SVector3"},"UserId":"b1585b4d-36f0-48a0-8ffa-1b72f01759da","SessionId":"61e82efa0bcb4a3088825dd75e115f61-2714020697","Origin":"gameclient","Id":"ad4e6c9d-4438-4fc1-bd6d-9697fe6ad6f0"}
 			// {"Timestamp":11.056235,"Name":"Level_Setup_Events","ContractSessionId":"2517213274420850852-356e1881-82f8-4c5a-b7f1-63ab8432c042","ContractId":"00000000-0000-0000-0000-000000000200","Value":{"Contract_Name_metricvalue":"TheShowstopper","Location_MetricValue":"Paris","Event_metricvalue":"Dahlia_Speech_Start"},"UserId":"b1585b4d-36f0-48a0-8ffa-1b72f01759da","SessionId":"61e82efa0bcb4a3088825dd75e115f61-2714020697","Origin":"gameclient","Id":"c7e69ba6-683f-427d-bd8a-cd5b0df5a43c"}
 			// {"Timestamp":11.463453,"Name":"Investigate_Curious","ContractSessionId":"2517213274420850852-356e1881-82f8-4c5a-b7f1-63ab8432c042","ContractId":"00000000-0000-0000-0000-000000000200","Value":{"ActorId":2655118168.000000,"RepositoryId":"f9c3905a-ec94-43b6-aae6-8b2f752467f7","SituationType":"AIS_INVESTIGATE_CURIOUS","EventType":"AISE_ActorJoined","JoinReason":"AISJR_Default","InvestigationType":9.000000},"UserId":"b1585b4d-36f0-48a0-8ffa-1b72f01759da","SessionId":"61e82efa0bcb4a3088825dd75e115f61-2714020697","Origin":"gameclient","Id":"8ad219e4-5222-4f7b-bdc8-b6224db5aa6d"}
-			Logger::Info("Setpiece: {}", s_EventData);
+			Logger::Debug("Setpiece: {}", s_EventData);
 		}
 		else if (eventName == "ItemPickedUp") {
 			++stats.misc.itemsPickedUp;
@@ -688,7 +695,7 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 			for (const auto& nameJson : s_JsonEvent["Value"])
 			{
 				auto name = nameJson.get<std::string>();
-				Logger::Info("Spotted by {}", name);
+				Logger::Debug("Spotted by {}", name);
 
 				stats.spottedBy.insert(name);
 				stats.detection.uniqueNPCsCaughtBy = static_cast<int>(stats.spottedBy.size());
@@ -821,7 +828,7 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 			switch (tension)
 			{
 			case EGameTension::EGT_Agitated:
-				Logger::Info("Game tension: agitated - it actually happened!");
+				Logger::Debug("Game tension: agitated - it actually happened!");
 				++stats.tension.agitated;
 				break;
 			case EGameTension::EGT_AlertedHigh:

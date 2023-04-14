@@ -97,7 +97,7 @@ public:
 	{
 		if (!parent)
 		{
-			Logger::Error("Creating text with no parent!");
+			Logger::Error("Stealthometer: creating text with no parent!");
 			return false;
 		}
 		if (!GetClientRect(parent, &this->clientRect)) return false;
@@ -208,7 +208,7 @@ private:
 		this->hFont = this->createFont();
 		if (this->hFont)
 			SendMessage(this->hWnd, WM_SETFONT, WPARAM(hFont), true);
-		else Logger::Error("Font not created");
+		else Logger::Error("Stealthometer: font not created.");
 	}
 
 	auto destroyFont() -> void
@@ -242,6 +242,7 @@ StatWindow::StatWindow(const DisplayStats& stats) : stats(stats)
 StatWindow::~StatWindow()
 {
 	this->destroy();
+	if (this->wclAtom) UnregisterClass((LPCSTR)this->wclAtom, NULL);
 }
 
 auto StatWindow::create(HINSTANCE instance) -> void
@@ -252,28 +253,30 @@ auto StatWindow::create(HINSTANCE instance) -> void
 
 	if (!hitmanWindow)
 	{
-		Logger::Warn("Could not locate game window.");
+		Logger::Warn("Stealthometer: could not locate game window.");
 		return;
 	}
 
-	Logger::Info("Creating external window");
-
 	this->runningWindow = true;
 
-	windowThread = std::thread([this, instance, hitmanWindow]
-		{
+	windowThread = std::thread([this, instance, hitmanWindow] {
+		if (!this->wclAtom) {
 			WNDCLASSEXA wcl = {};
 			wcl.cbSize = sizeof(WNDCLASSEXA);
 			wcl.style = CS_OWNDC;
-			wcl.lpfnWndProc = [](HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
-			{
+			wcl.lpfnWndProc = [](HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 				if (msg == WM_CREATE)
 					SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(reinterpret_cast<CREATESTRUCT*>(lParam)->lpCreateParams));
 
 				auto statWindow = reinterpret_cast<StatWindow*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
 
-				switch (msg)
-				{
+				switch (msg) {
+					case STEALTHOMETER_CLOSE_EXTERNAL_WINDOW:
+						break;
+					case WM_DESTROY:
+						break;
+					case WM_NCDESTROY:
+						break;
 					case WM_CREATE:
 						break;
 					case WM_PAINT:
@@ -294,44 +297,46 @@ auto StatWindow::create(HINSTANCE instance) -> void
 			wcl.lpszClassName = "Stealthometer";
 			wcl.hIconSm = reinterpret_cast<HICON>(GetClassLongPtr(hitmanWindow, GCLP_HICONSM));
 
-			wclAtom = RegisterClassEx(&wcl);
-			this->hWnd = CreateWindow(
-				reinterpret_cast<LPCSTR>(wclAtom),
-				static_cast<LPCSTR>("Stealthometer"),
-				WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_CLIPCHILDREN,
-				CW_USEDEFAULT, CW_USEDEFAULT,
-				400, 485,
-				NULL, NULL,
-				instance,
-				this
-			);
+			this->wclAtom = RegisterClassEx(&wcl);
+		}
 
-			if (!this->hWnd)
-			{
-				Logger::Error("Error: Stealthometer external window could not be created.");
-				this->runningWindow = false;
-				return;
-			}
+		this->hWnd = CreateWindow(
+			reinterpret_cast<LPCSTR>(this->wclAtom),
+			static_cast<LPCSTR>("Stealthometer"),
+			WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_CLIPCHILDREN,
+			CW_USEDEFAULT, CW_USEDEFAULT,
+			400, 485,
+			NULL, NULL,
+			instance,
+			this
+		);
 
-			ShowWindow(this->hWnd, SW_SHOW);
-			UpdateWindow(this->hWnd);
-
-			MSG msg;
-			while (this->runningWindow)
-			{
-				if (GetMessage(&msg, this->hWnd, NULL, NULL) > 0)
-				{
-					TranslateMessage(&msg);
-					DispatchMessage(&msg);
-
-					if (msg.message == WM_CLOSE || msg.message == WM_DESTROY)
-						this->runningWindow = false;
-				}
-				else break;
-			}
-
+		if (!this->hWnd)
+		{
+			Logger::Error("Stealthometer: failed to create external window - {}", GetLastError());
 			this->runningWindow = false;
-		});
+			return;
+		}
+
+		ShowWindow(this->hWnd, SW_SHOW);
+		UpdateWindow(this->hWnd);
+
+		MSG msg;
+		while (GetMessage(&msg, NULL, NULL, NULL) > 0) {
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+
+			if (msg.message == STEALTHOMETER_CLOSE_EXTERNAL_WINDOW) {
+				if (this->hWnd) {
+					DestroyWindow(this->hWnd);
+					this->hWnd = nullptr;
+				}
+				break;
+			}
+		}
+
+		this->runningWindow = false;
+	});
 }
 
 auto getCellPosY(int row)
@@ -469,8 +474,7 @@ auto StatWindow::formatStat(Stat stat) -> std::string
 			return this->stats.playstyle;
 		}
 		case Stat::SilentAssassin:
-			switch (this->stats.silentAssassin)
-			{
+			switch (this->stats.silentAssassin) {
 				case SilentAssassinStatus::OK:
 					return "Silent Assassin";
 				case SilentAssassinStatus::Fail:
@@ -503,8 +507,7 @@ auto createWindowBottomRow(HWND parent) -> HWND
 
 auto StatWindow::update() -> void
 {
-	if (this->hWnd)
-	{
+	if (this->hWnd) {
 		InvalidateRect(this->hWnd, NULL, true);
 		UpdateWindow(this->hWnd);
 	}
@@ -512,14 +515,10 @@ auto StatWindow::update() -> void
 
 auto StatWindow::destroy() -> void
 {
-	this->runningWindow = false;
-	this->windowThread.detach();
-
-	if (this->hWnd) DestroyWindow(this->hWnd);
-	if (this->wclAtom) UnregisterClass((LPCSTR)this->wclAtom, NULL);
-
-	this->hWnd = nullptr;
-	this->wclAtom = NULL;
+	if (this->hWnd) {
+		PostThreadMessage(GetThreadId(this->windowThread.native_handle()), STEALTHOMETER_CLOSE_EXTERNAL_WINDOW, 0, 0);
+		this->windowThread.detach();
+	}
 }
 
 auto StatWindow::setDarkMode(bool enable) -> void

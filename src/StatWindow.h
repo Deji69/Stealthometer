@@ -4,6 +4,8 @@
 #include <Windows.h>
 #include "Stats.h"
 
+#define STEALTHOMETER_CLOSE_EXTERNAL_WINDOW (WM_USER + 0x8008)
+
 class StatWindow
 {
 	enum class Stat

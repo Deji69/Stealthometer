@@ -46,6 +46,7 @@ private:
 	std::array<ActorKnowledgeData, 1000> actorData;
 	std::vector<std::string> eventHistory;
 	bool statVisibleUI = false;
+	bool externalWindowEnabled = true;
 };
 
 DEFINE_ZHM_PLUGIN(Stealthometer)
