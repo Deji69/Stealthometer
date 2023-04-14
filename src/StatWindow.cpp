@@ -271,7 +271,7 @@ auto StatWindow::create(HINSTANCE instance) -> void
 				auto statWindow = reinterpret_cast<StatWindow*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
 
 				switch (msg) {
-					case STEALTHOMETER_CLOSE_EXTERNAL_WINDOW:
+					case STEALTHOMETER_CLOSE_WINDOW:
 						break;
 					case WM_DESTROY:
 						break;
@@ -292,7 +292,7 @@ auto StatWindow::create(HINSTANCE instance) -> void
 			wcl.hInstance = instance;
 			wcl.hIcon = reinterpret_cast<HICON>(GetClassLongPtr(hitmanWindow, GCLP_HICON));
 			wcl.hCursor = LoadCursor(NULL, IDC_ARROW);
-			wcl.hbrBackground = NULL;//(HBRUSH)COLOR_WINDOW;
+			wcl.hbrBackground = NULL;
 			wcl.lpszMenuName = NULL;
 			wcl.lpszClassName = "Stealthometer";
 			wcl.hIconSm = reinterpret_cast<HICON>(GetClassLongPtr(hitmanWindow, GCLP_HICONSM));
@@ -326,12 +326,16 @@ auto StatWindow::create(HINSTANCE instance) -> void
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 
-			if (msg.message == STEALTHOMETER_CLOSE_EXTERNAL_WINDOW) {
+			if (msg.message == STEALTHOMETER_CLOSE_WINDOW) {
 				if (this->hWnd) {
 					DestroyWindow(this->hWnd);
 					this->hWnd = nullptr;
 				}
 				break;
+			}
+			else if (this->hWnd) {
+				if (msg.message == STEALTHOMETER_REDRAW_WINDOW)
+					InvalidateRect(this->hWnd, NULL, true);
 			}
 		}
 
@@ -377,12 +381,7 @@ auto StatWindow::paintBg(HWND wnd, HDC hdc) -> void
 	RECT rc;
 	HBRUSH brush = this->darkMode ? static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)) : reinterpret_cast<HBRUSH>(COLOR_WINDOW);
 	GetClientRect(wnd, &rc);
-	//SetMapMode(hdc, MM_ANISOTROPIC);
-	//SIZE oldWinExt;
-	//SetWindowExtEx(hdc, 100, 100, &oldWinExt);
-	//auto oldViewExt = SetViewportExtEx(hdc, rc.right, rc.bottom, NULL);
 	FillRect(hdc, &rc, brush);
-	//SetWindowExtEx(hdc, oldWinExt.cx, oldWinExt.cy, NULL);
 }
 
 auto StatWindow::paint(HWND wnd) -> void
@@ -408,16 +407,6 @@ auto StatWindow::paint(HWND wnd) -> void
 
 	this->paintCell(hdc, "Traceless", Stat::PlayStyle, 0, 6);
 	this->paintCell(hdc, "Stealth", Stat::StealthRating, 1, 6);
-
-	// paint rating area
-	/*auto anchor = col == 0 ? Anchor::Left : Anchor::Right;
-	auto y = getCellPosY(row);
-	RECT rect;
-	GetClientRect(this->hWnd, &rect);
-	TextLabel label(header, 0, y, 50, 30);
-	label.setHAnchor(anchor);
-	label.setAlign(TextAlign::Center);
-	label.paint(this->hWnd, hdc, rect);*/
 
 	TextLabel saText(this->formatStat(Stat::SilentAssassin), 0, 2, 100, 30);
 	saText.setSize(28);
@@ -507,16 +496,13 @@ auto createWindowBottomRow(HWND parent) -> HWND
 
 auto StatWindow::update() -> void
 {
-	if (this->hWnd) {
-		InvalidateRect(this->hWnd, NULL, true);
-		UpdateWindow(this->hWnd);
-	}
+	PostThreadMessage(GetThreadId(this->windowThread.native_handle()), STEALTHOMETER_REDRAW_WINDOW, 0, 0);
 }
 
 auto StatWindow::destroy() -> void
 {
 	if (this->hWnd) {
-		PostThreadMessage(GetThreadId(this->windowThread.native_handle()), STEALTHOMETER_CLOSE_EXTERNAL_WINDOW, 0, 0);
+		PostThreadMessage(GetThreadId(this->windowThread.native_handle()), STEALTHOMETER_CLOSE_WINDOW, 0, 0);
 		this->windowThread.detach();
 	}
 }
@@ -524,4 +510,5 @@ auto StatWindow::destroy() -> void
 auto StatWindow::setDarkMode(bool enable) -> void
 {
 	this->darkMode = enable;
+	this->update();
 }

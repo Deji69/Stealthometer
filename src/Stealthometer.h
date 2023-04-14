@@ -47,6 +47,7 @@ private:
 	std::vector<std::string> eventHistory;
 	bool statVisibleUI = false;
 	bool externalWindowEnabled = true;
+	bool externalWindowDarkMode = true;
 };
 
 DEFINE_ZHM_PLUGIN(Stealthometer)

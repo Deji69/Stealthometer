@@ -359,11 +359,11 @@ auto Stealthometer::OnDrawUI(bool) -> void
 	if (s_WindowExpanded)
 	{
 		if (ImGui::Checkbox("External Window", &this->externalWindowEnabled)) {
-			if (this->externalWindowEnabled)
-				this->window.create(hInstance);
-			else
-				this->window.destroy();
+			if (this->externalWindowEnabled) this->window.create(hInstance);
+			else this->window.destroy();
 		}
+		if (ImGui::Checkbox("External Window Dark Mode", &this->externalWindowDarkMode))
+			this->window.setDarkMode(this->externalWindowDarkMode);
 
 		/*ImGui::BeginTable("RatingTable", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_ScrollY);
 
