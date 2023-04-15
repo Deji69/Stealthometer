@@ -34,6 +34,9 @@ public:
 	auto CalculateStealthRating() -> double;
 
 private:
+	auto DrawSettingsUI(bool hasFocus) -> void;
+
+private:
 	//DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZGameStatsManager_SendAISignals, ZGameStatsManager* th);
 	//DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZKnowledge_SetGameTension, ZKnowledge* knowledge, EGameTension tension);
 	DECLARE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent, ZAchievementManagerSimple* th, uint32_t eventIndex, const ZDynamicObject& ev);
@@ -48,6 +51,7 @@ private:
 	bool statVisibleUI = false;
 	bool externalWindowEnabled = true;
 	bool externalWindowDarkMode = true;
+	bool externalWindowOnTop = false;
 };
 
 DEFINE_ZHM_PLUGIN(Stealthometer)

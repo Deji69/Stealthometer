@@ -95,8 +95,7 @@ public:
 
 	auto create(HWND parent) -> bool
 	{
-		if (!parent)
-		{
+		if (!parent) {
 			Logger::Error("Stealthometer: creating text with no parent!");
 			return false;
 		}
@@ -245,14 +244,54 @@ StatWindow::~StatWindow()
 	if (this->wclAtom) UnregisterClass((LPCSTR)this->wclAtom, NULL);
 }
 
+auto StatWindow::registerWindowClass(HINSTANCE instance, HWND parentWindow) -> ATOM
+{
+	WNDCLASSEXA wcl = {};
+	wcl.cbSize = sizeof(WNDCLASSEXA);
+	wcl.style = CS_OWNDC;
+	wcl.lpfnWndProc = [](HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+		if (msg == WM_CREATE)
+			SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(reinterpret_cast<CREATESTRUCT*>(lParam)->lpCreateParams));
+
+		auto statWindow = reinterpret_cast<StatWindow*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+
+		switch (msg) {
+			case STEALTHOMETER_CLOSE_WINDOW:
+				break;
+			case WM_DESTROY:
+				break;
+			case WM_NCDESTROY:
+				break;
+			case WM_CREATE:
+				break;
+			case WM_PAINT:
+				statWindow->paint(hwnd);
+				break;
+			case WM_ERASEBKGND:
+				statWindow->paintBg(hwnd, reinterpret_cast<HDC>(wParam));
+				break;
+		}
+		return DefWindowProc(hwnd, msg, wParam, lParam);
+	};
+
+	wcl.hInstance = instance;
+	wcl.hIcon = reinterpret_cast<HICON>(GetClassLongPtr(parentWindow, GCLP_HICON));
+	wcl.hCursor = LoadCursor(NULL, IDC_ARROW);
+	wcl.hbrBackground = NULL;
+	wcl.lpszMenuName = NULL;
+	wcl.lpszClassName = "Stealthometer";
+	wcl.hIconSm = reinterpret_cast<HICON>(GetClassLongPtr(parentWindow, GCLP_HICONSM));
+
+	return RegisterClassEx(&wcl);
+}
+
 auto StatWindow::create(HINSTANCE instance) -> void
 {
 	if (this->runningWindow) return;
 
 	auto hitmanWindow = FindWindow(NULL, "HITMAN 3");
 
-	if (!hitmanWindow)
-	{
+	if (!hitmanWindow) {
 		Logger::Warn("Stealthometer: could not locate game window.");
 		return;
 	}
@@ -260,45 +299,7 @@ auto StatWindow::create(HINSTANCE instance) -> void
 	this->runningWindow = true;
 
 	windowThread = std::thread([this, instance, hitmanWindow] {
-		if (!this->wclAtom) {
-			WNDCLASSEXA wcl = {};
-			wcl.cbSize = sizeof(WNDCLASSEXA);
-			wcl.style = CS_OWNDC;
-			wcl.lpfnWndProc = [](HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-				if (msg == WM_CREATE)
-					SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(reinterpret_cast<CREATESTRUCT*>(lParam)->lpCreateParams));
-
-				auto statWindow = reinterpret_cast<StatWindow*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
-
-				switch (msg) {
-					case STEALTHOMETER_CLOSE_WINDOW:
-						break;
-					case WM_DESTROY:
-						break;
-					case WM_NCDESTROY:
-						break;
-					case WM_CREATE:
-						break;
-					case WM_PAINT:
-						statWindow->paint(hwnd);
-						break;
-					case WM_ERASEBKGND:
-						statWindow->paintBg(hwnd, reinterpret_cast<HDC>(wParam));
-						break;
-				}
-
-				return DefWindowProc(hwnd, msg, wParam, lParam);
-			};
-			wcl.hInstance = instance;
-			wcl.hIcon = reinterpret_cast<HICON>(GetClassLongPtr(hitmanWindow, GCLP_HICON));
-			wcl.hCursor = LoadCursor(NULL, IDC_ARROW);
-			wcl.hbrBackground = NULL;
-			wcl.lpszMenuName = NULL;
-			wcl.lpszClassName = "Stealthometer";
-			wcl.hIconSm = reinterpret_cast<HICON>(GetClassLongPtr(hitmanWindow, GCLP_HICONSM));
-
-			this->wclAtom = RegisterClassEx(&wcl);
-		}
+		if (!this->wclAtom) this->wclAtom = this->registerWindowClass(instance, hitmanWindow);
 
 		this->hWnd = CreateWindow(
 			reinterpret_cast<LPCSTR>(this->wclAtom),
@@ -311,8 +312,7 @@ auto StatWindow::create(HINSTANCE instance) -> void
 			this
 		);
 
-		if (!this->hWnd)
-		{
+		if (!this->hWnd) {
 			Logger::Error("Stealthometer: failed to create external window - {}", GetLastError());
 			this->runningWindow = false;
 			return;
@@ -321,7 +321,8 @@ auto StatWindow::create(HINSTANCE instance) -> void
 		ShowWindow(this->hWnd, SW_SHOW);
 		UpdateWindow(this->hWnd);
 
-		MSG msg;
+		auto msg = MSG{};
+
 		while (GetMessage(&msg, NULL, NULL, NULL) > 0) {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
@@ -334,8 +335,12 @@ auto StatWindow::create(HINSTANCE instance) -> void
 				break;
 			}
 			else if (this->hWnd) {
-				if (msg.message == STEALTHOMETER_REDRAW_WINDOW)
+				if (msg.message == STEALTHOMETER_UPDATE_WINDOW) {
 					InvalidateRect(this->hWnd, NULL, true);
+
+					if (this->wasOnTop != this->onTop)
+						SetWindowPos(this->hWnd, this->onTop ? HWND_TOPMOST : HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+				}
 			}
 		}
 
@@ -358,8 +363,7 @@ auto StatWindow::paintCell(HDC hdc, std::string header, Stat stat, int col, int 
 	GetClientRect(this->hWnd, &rect);
 
 	if (row == 6) y += 12;
-	else
-	{
+	else {
 		TextLabel label(header, 0, y, 50, 30);
 		label.setHAnchor(anchor);
 		label.setAlign(TextAlign::Center);
@@ -430,8 +434,7 @@ auto StatWindow::paint(HWND wnd) -> void
 
 auto StatWindow::formatStat(Stat stat) -> std::string
 {
-	switch (stat)
-	{
+	switch (stat) {
 		case Stat::Tension:
 			return std::format("{:d}%", this->stats.tension);
 		case Stat::Pacifications:
@@ -465,15 +468,15 @@ auto StatWindow::formatStat(Stat stat) -> std::string
 		case Stat::SilentAssassin:
 			switch (this->stats.silentAssassin) {
 				case SilentAssassinStatus::OK:
-					return "Silent Assassin";
+					return "Silent Assassin"s;
 				case SilentAssassinStatus::Fail:
-					return "X Silent Assassin";
+					return "X Silent Assassin"s;
 				case SilentAssassinStatus::RedeemableCamera:
-					return "Silent Assassin (Cams)";
+					return "Silent Assassin (Cams)"s;
 				case SilentAssassinStatus::RedeemableTarget:
-					return "Silent Assassin (Target)";
+					return "Silent Assassin (Target)"s;
 				case SilentAssassinStatus::RedeemableCameraAndTarget:
-					return "Silent Assassin (Cams, Target)";
+					return "Silent Assassin (Cams, Target)"s;
 			}
 			break;
 	}
@@ -496,7 +499,7 @@ auto createWindowBottomRow(HWND parent) -> HWND
 
 auto StatWindow::update() -> void
 {
-	PostThreadMessage(GetThreadId(this->windowThread.native_handle()), STEALTHOMETER_REDRAW_WINDOW, 0, 0);
+	PostThreadMessage(GetThreadId(this->windowThread.native_handle()), STEALTHOMETER_UPDATE_WINDOW, 0, 0);
 }
 
 auto StatWindow::destroy() -> void
@@ -510,5 +513,11 @@ auto StatWindow::destroy() -> void
 auto StatWindow::setDarkMode(bool enable) -> void
 {
 	this->darkMode = enable;
+	this->update();
+}
+
+auto StatWindow::setAlwaysOnTop(bool enable) -> void
+{
+	this->onTop = enable;
 	this->update();
 }

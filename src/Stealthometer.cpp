@@ -348,22 +348,29 @@ auto Stealthometer::OnDrawMenu() -> void
 		this->statVisibleUI = !this->statVisibleUI;
 }
 
-auto Stealthometer::OnDrawUI(bool) -> void
+auto Stealthometer::DrawSettingsUI(bool focused) -> void
+{
+	if (ImGui::Checkbox("External Window", &this->externalWindowEnabled)) {
+		if (this->externalWindowEnabled) this->window.create(hInstance);
+		else this->window.destroy();
+	}
+	if (ImGui::Checkbox("External Window Dark Mode", &this->externalWindowDarkMode))
+		this->window.setDarkMode(this->externalWindowDarkMode);
+
+	if (ImGui::Checkbox("External Window On Top", &this->externalWindowOnTop))
+		this->window.setAlwaysOnTop(this->externalWindowOnTop);
+}
+
+auto Stealthometer::OnDrawUI(bool focused) -> void
 {
 	if (!this->statVisibleUI) return;
 
 	ImGui::PushFont(SDK()->GetImGuiBlackFont());
-	const auto s_WindowExpanded = ImGui::Begin(ICON_MD_PIE_CHART " STEALTHOMETER", nullptr);
+	const auto windowExpanded = ImGui::Begin(ICON_MD_PIE_CHART " STEALTHOMETER", nullptr);
 	ImGui::PushFont(SDK()->GetImGuiRegularFont());
 
-	if (s_WindowExpanded)
-	{
-		if (ImGui::Checkbox("External Window", &this->externalWindowEnabled)) {
-			if (this->externalWindowEnabled) this->window.create(hInstance);
-			else this->window.destroy();
-		}
-		if (ImGui::Checkbox("External Window Dark Mode", &this->externalWindowDarkMode))
-			this->window.setDarkMode(this->externalWindowDarkMode);
+	if (windowExpanded) {
+		this->DrawSettingsUI(focused);
 
 		/*ImGui::BeginTable("RatingTable", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_ScrollY);
 
