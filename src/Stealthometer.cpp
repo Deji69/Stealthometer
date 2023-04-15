@@ -350,49 +350,48 @@ auto Stealthometer::OnDrawMenu() -> void
 
 auto Stealthometer::DrawSettingsUI(bool focused) -> void
 {
-	if (ImGui::Checkbox("External Window", &this->externalWindowEnabled)) {
-		if (this->externalWindowEnabled) this->window.create(hInstance);
-		else this->window.destroy();
-	}
-	if (ImGui::Checkbox("External Window Dark Mode", &this->externalWindowDarkMode))
-		this->window.setDarkMode(this->externalWindowDarkMode);
+	ImGui::PushFont(SDK()->GetImGuiBlackFont());
+	const auto windowExpanded = ImGui::Begin(ICON_MD_PIE_CHART " STEALTHOMETER", nullptr);
+	ImGui::PushFont(SDK()->GetImGuiRegularFont());
 
-	if (ImGui::Checkbox("External Window On Top", &this->externalWindowOnTop))
-		this->window.setAlwaysOnTop(this->externalWindowOnTop);
+	if (windowExpanded) {
+		if (ImGui::Checkbox("External Window", &this->externalWindowEnabled)) {
+			if (this->externalWindowEnabled) this->window.create(hInstance);
+			else this->window.destroy();
+		}
+		if (ImGui::Checkbox("External Window Dark Mode", &this->externalWindowDarkMode))
+			this->window.setDarkMode(this->externalWindowDarkMode);
+
+		if (ImGui::Checkbox("External Window On Top", &this->externalWindowOnTop))
+			this->window.setAlwaysOnTop(this->externalWindowOnTop);
+	}
+
+	ImGui::PopFont();
+	ImGui::End();
+	ImGui::PopFont();
 }
 
 auto Stealthometer::OnDrawUI(bool focused) -> void
 {
 	if (!this->statVisibleUI) return;
 
-	ImGui::PushFont(SDK()->GetImGuiBlackFont());
-	const auto windowExpanded = ImGui::Begin(ICON_MD_PIE_CHART " STEALTHOMETER", nullptr);
-	ImGui::PushFont(SDK()->GetImGuiRegularFont());
+	this->DrawSettingsUI(focused);
+	/*ImGui::BeginTable("RatingTable", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_ScrollY);
 
-	if (windowExpanded) {
-		this->DrawSettingsUI(focused);
+	AcquireSRWLockShared(&this->eventLock);
 
-		/*ImGui::BeginTable("RatingTable", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_ScrollY);
-
-		AcquireSRWLockShared(&this->eventLock);
-
-		for (auto& eventName : this->eventHistory)
-		{
-			ImGui::TableNextRow();
-			ImGui::TableNextColumn();
-			ImGui::TextUnformatted("Test");
-			ImGui::TableNextColumn();
-			ImGui::Text("%lld", eventName);
-		}
-
-		ReleaseSRWLockShared(&this->eventLock);
-
-		ImGui::EndTable();*/
+	for (auto& eventName : this->eventHistory)
+	{
+		ImGui::TableNextRow();
+		ImGui::TableNextColumn();
+		ImGui::TextUnformatted("Test");
+		ImGui::TableNextColumn();
+		ImGui::Text("%lld", eventName);
 	}
 
-	ImGui::PopFont();
-	ImGui::End();
-	ImGui::PopFont();
+	ReleaseSRWLockShared(&this->eventLock);
+
+	ImGui::EndTable();*/
 	
 }
 

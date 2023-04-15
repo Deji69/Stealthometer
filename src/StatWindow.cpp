@@ -127,7 +127,7 @@ public:
 	auto paint(HWND wnd, HDC hdc, RECT bounds)
 	{
 		this->clientRect = bounds;
-		RECT rect = { this->getLeftPos(), this->getTopPos(), this->getRightpos(), this->getBottomPos() };
+		auto rect = RECT{ this->getLeftPos(), this->getTopPos(), this->getRightpos(), this->getBottomPos() };
 		auto font = this->createFont();
 		auto oldColour = SetTextColor(hdc, this->colour);
 		auto oldFont = SelectObject(hdc, font);
@@ -180,7 +180,7 @@ private:
 
 	auto getFormat() -> UINT
 	{
-		UINT fmt = DT_SINGLELINE | DT_VCENTER | DT_WORDBREAK;
+		auto fmt = UINT{DT_SINGLELINE | DT_VCENTER | DT_WORDBREAK};
 		if (this->align == TextAlign::Left) fmt |= DT_LEFT;
 		else if (this->align == TextAlign::Center) fmt |= DT_CENTER;
 		return fmt;
@@ -246,7 +246,7 @@ StatWindow::~StatWindow()
 
 auto StatWindow::registerWindowClass(HINSTANCE instance, HWND parentWindow) -> ATOM
 {
-	WNDCLASSEXA wcl = {};
+	auto wcl = WNDCLASSEXA{};
 	wcl.cbSize = sizeof(WNDCLASSEXA);
 	wcl.style = CS_OWNDC;
 	wcl.lpfnWndProc = [](HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -359,7 +359,8 @@ auto StatWindow::paintCell(HDC hdc, std::string header, Stat stat, int col, int 
 	auto textColour = this->darkMode ? RGB(255, 255, 255) : RGB(0, 0, 0);
 	auto anchor = col == 0 ? Anchor::Left : Anchor::Right;
 	auto y = getCellPosY(row);
-	RECT rect;
+	auto rect = RECT{};
+
 	GetClientRect(this->hWnd, &rect);
 
 	if (row == 6) y += 12;
@@ -372,6 +373,7 @@ auto StatWindow::paintCell(HDC hdc, std::string header, Stat stat, int col, int 
 	}
 
 	if (row != 6) y += 25;
+
 	TextLabel valueText(this->formatStat(stat), 0, y, 50, 30);
 	valueText.setBold(true);
 	valueText.setHAnchor(anchor);
@@ -382,17 +384,19 @@ auto StatWindow::paintCell(HDC hdc, std::string header, Stat stat, int col, int 
 
 auto StatWindow::paintBg(HWND wnd, HDC hdc) -> void
 {
-	RECT rc;
-	HBRUSH brush = this->darkMode ? static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)) : reinterpret_cast<HBRUSH>(COLOR_WINDOW);
+	auto rc = RECT{};
+	auto brush = this->darkMode ? static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)) : reinterpret_cast<HBRUSH>(COLOR_WINDOW);
 	GetClientRect(wnd, &rc);
 	FillRect(hdc, &rc, brush);
 }
 
 auto StatWindow::paint(HWND wnd) -> void
 {
-	PAINTSTRUCT ps;
-	RECT rect;
+	auto ps = PAINTSTRUCT{};
+	auto rect = RECT{};
+
 	GetClientRect(wnd, &rect);
+
 	auto hdc = BeginPaint(wnd, &ps);
 	auto oldBkMode = SetBkMode(hdc, TRANSPARENT);
 
