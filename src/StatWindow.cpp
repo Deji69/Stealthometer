@@ -363,7 +363,7 @@ auto StatWindow::paintCell(HDC hdc, std::string header, Stat stat, int col, int 
 
 	GetClientRect(this->hWnd, &rect);
 
-	if (row == 6) y += 12;
+	if (row == 6) y += 10;
 	else {
 		TextLabel label(header, 0, y, 50, 30);
 		label.setHAnchor(anchor);
