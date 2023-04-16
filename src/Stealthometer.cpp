@@ -302,19 +302,34 @@ auto behaviourToString(ECompiledBehaviorType bt)
 	}
 }
 
+auto Stealthometer::IsRepoIdTargetNPC(std::string id) -> bool
+{
+	std::transform(id.begin(), id.end(), id.begin(),[](auto c) { return std::toupper(c); });
+	for (auto const& actor : this->actorData) {
+		if (!actor.isTarget) continue;
+		if (id == actor.repoId) return true;
+	}
+	return false;
+}
+
 auto Stealthometer::OnFrameUpdate(const SGameUpdateEvent& ev) -> void
 {
-	for (int i = 0; i < *Globals::NextActorId; ++i)
-	{
+	for (int i = 0; i < *Globals::NextActorId; ++i) {
 		const auto& actor = Globals::ActorManager->m_aActiveActors[i];
 		const auto actorSpatial = actor.m_ref.QueryInterface<ZSpatialEntity>();
 		auto& actorData = this->actorData[i];
 
+		if (!actorData.ref) {
+			actorData.ref = &actor;
+			auto repoEntity = actor.m_ref.QueryInterface<ZRepositoryItemEntity>();
+			actorData.repoId = repoEntity->m_sId.ToString();
+			actorData.isTarget = actor.m_pInterfaceRef->m_bUnk16;
+		}
+
 		if (!actorSpatial)
 			continue;
 
-		if (actor.m_pInterfaceRef->m_nCurrentBehaviorIndex >= 0)
-		{
+		if (actor.m_pInterfaceRef->m_nCurrentBehaviorIndex >= 0) {
 			// (&behaviour + 0xD8) = m_pPreviousBehavior ?
 
 			auto& behaviour = Globals::BehaviorService->m_aKnowledgeData[actor.m_pInterfaceRef->m_nCurrentBehaviorIndex];
@@ -331,8 +346,7 @@ auto Stealthometer::OnFrameUpdate(const SGameUpdateEvent& ev) -> void
 
 			if (!tension) continue;
 
-			if (tension > actorData.highestTensionLevel)
-			{
+			if (tension > actorData.highestTensionLevel) {
 				if (actorData.highestTensionLevel) tension -= actorData.highestTensionLevel;
 				actorData.highestTensionLevel += tension;
 				this->stats.tension.level += tension;
@@ -376,6 +390,7 @@ auto Stealthometer::OnDrawUI(bool focused) -> void
 	if (!this->statVisibleUI) return;
 
 	this->DrawSettingsUI(focused);
+
 	/*ImGui::BeginTable("RatingTable", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_ScrollY);
 
 	AcquireSRWLockShared(&this->eventLock);
@@ -397,9 +412,8 @@ auto Stealthometer::OnDrawUI(bool focused) -> void
 
 auto Stealthometer::NewContract() -> void
 {
-	for (auto& actorData : this->actorData)
-	{
-		actorData = ActorKnowledgeData{};
+	for (auto& actorData : this->actorData) {
+		actorData = ActorData{};
 	}
 
 	this->stats = Stats();
@@ -459,8 +473,8 @@ auto Stealthometer::UpdateDisplayStats() -> void
 	}
 
 	// Spotted
-	if (this->displayStats.spotted != this->stats.detection.uniqueNPCsCaughtBy) {
-		this->displayStats.spotted = this->stats.detection.uniqueNPCsCaughtBy;
+	if (this->displayStats.spotted != (this->stats.detection.targetsSpottedBy + this->stats.detection.nonTargetsSpottedBy)) {
+		this->displayStats.spotted = this->stats.detection.targetsSpottedBy + this->stats.detection.nonTargetsSpottedBy;
 		updated = true;
 	}
 
@@ -525,8 +539,10 @@ auto Stealthometer::UpdateDisplayStats() -> void
 	auto sa = SilentAssassinStatus::OK;
 	if (this->stats.bodies.found || this->stats.kills.nonTargets > 0)
 		sa = SilentAssassinStatus::Fail;
-	else if (this->stats.detection.uniqueNPCsCaughtBy > this->stats.detection.uniqueNPCsCaughtByAndKilled)
+	else if (this->stats.detection.nonTargetsSpottedBy)
 		sa = SilentAssassinStatus::Fail;
+	else if (this->stats.detection.targetsSpottedBy > this->stats.detection.targetsSpottedByAndKilled)
+		sa = SilentAssassinStatus::RedeemableTarget;
 
 	if (this->stats.detection.onCamera) {
 		if (sa == SilentAssassinStatus::OK) sa = SilentAssassinStatus::RedeemableCamera;
@@ -572,16 +588,14 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 		const std::string eventName = s_JsonEvent["Name"];
 		Stats& stats = this->stats;
 
-		if (eventName == "ContractStart")
-		{
+		if (eventName == "ContractStart") {
 			this->NewContract();
 		}
-		else if (eventName == "SetupTarget")
-		{
+		else if (eventName == "SetupTarget") {
 			Logger::Debug("SetupTarget: {}", s_EventData);
 		}
-		else if (eventName == "setpieces")
-		{
+		//eventName == "ItemDestroyed"
+		else if (eventName == "setpieces") {
 			// Blown up propane:
 			// {"Timestamp":136.863831,"Name":"setpieces","ContractSessionId":"2517213287667595942-d688bab6-034a-488b-a483-89cfac74656f","ContractId":"00000000-0000-0000-0000-000000000400","Value":{"RepositoryId":"2b29d641-2a0d-4781-b2dd-0df02bc2674b","name_metricvalue":"PropaneFlask","setpieceHelper_metricvalue":"PropHelper_Explosion","setpieceType_metricvalue":"trap","toolUsed_metricvalue":"Exploded","Item_triggered_metricvalue":"NotAvailable","Position":"ZDynamicObject::ToString() unknown type: SVector3"},"UserId":"b1585b4d-36f0-48a0-8ffa-1b72f01759da","SessionId":"61e82efa0bcb4a3088825dd75e115f61-2714020697","Origin":"gameclient","Id":"4dcd73fe-7d2c-443b-aeac-10cd279ec971"}
 			
@@ -615,25 +629,20 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 		else if (eventName == "ItemPickedUp") {
 			++stats.misc.itemsPickedUp;
 		}
-		else if (eventName == "ItemRemovedFromInventory")
-		{
+		else if (eventName == "ItemRemovedFromInventory") {
 			++stats.misc.itemsRemovedFromInventory;
 		}
-		else if (eventName == "ItemThrown")
-		{
+		else if (eventName == "ItemThrown") {
 			++stats.misc.itemsThrown;
 		}
-		else if (eventName == "Actorsick")
-		{
+		else if (eventName == "Actorsick") {
 			++stats.misc.targetsMadeSick;
 		}
-		else if (eventName == "Trespassing")
-		{
+		else if (eventName == "Trespassing") {
 			if (s_JsonEvent["Value"]["IsTrespassing"].get<bool>())
 				++stats.misc.timesTrespassed;
 		}
-		else if (eventName == "SecuritySystemRecorder")
-		{
+		else if (eventName == "SecuritySystemRecorder") {
 			const auto& val = s_JsonEvent["Value"]["event"];
 
 			if (val == "spotted")
@@ -643,97 +652,80 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 			else if (val == "CameraDestroyed")
 				++stats.misc.camerasDestroyed;
 		}
-		else if (eventName == "Agility_Start" || eventName == "Drain_Pipe_Climbed")
-		{
+		else if (eventName == "Agility_Start" || eventName == "Drain_Pipe_Climbed") {
 			++stats.misc.agilityActions;
 		}
-		else if (eventName == "AccidentBodyFound")
-		{
+		else if (eventName == "AccidentBodyFound") {
 			++stats.bodies.foundAccidents;
 		}
-		else if (eventName == "DeadBodySeen")
-		{
+		else if (eventName == "DeadBodySeen") {
 			++stats.bodies.deadSeen;
 		}
-		else if (eventName == "MurderedBodySeen")
-		{
+		else if (eventName == "MurderedBodySeen") {
 			++stats.bodies.foundMurdered;
 			if (s_JsonEvent["Value"]["DeadBody"]["IsCrowdActor"].get<bool>())
 				++stats.bodies.foundCrowdMurders;
 		}
-		else if (eventName == "BodyFound")
-		{
+		else if (eventName == "BodyFound") {
 			++stats.bodies.found;
 			if (s_JsonEvent["Value"]["DeadBody"]["IsCrowdActor"].get<bool>())
 				++stats.bodies.foundCrowd;
 		}
-		else if (eventName == "Disguise")
-		{
+		else if (eventName == "Disguise") {
 			++stats.misc.disguisesTaken;
 			// TODO: suit retrieval?
 		}
-		else if (eventName == "SituationContained")
-		{
+		else if (eventName == "SituationContained") {
 			++stats.detection.situationsContained;
 		}
-		else if (eventName == "TargetBodySpotted")
-		{
+		else if (eventName == "TargetBodySpotted") {
 			++stats.bodies.targetsFound;
 		}
-		else if (eventName == "BodyHidden")
-		{
+		else if (eventName == "BodyHidden") {
 			++stats.bodies.hidden;
 		}
-		else if (eventName == "BodyBagged")
-		{
+		else if (eventName == "BodyBagged") {
 			++stats.bodies.bagged;
 		}
-		else if (eventName == "AllBodiesHidden")
-		{
+		else if (eventName == "AllBodiesHidden") {
 			stats.bodies.allHidden = true;
 		}
-		else if (eventName == "ShotsFired")
-		{
+		else if (eventName == "ShotsFired") {
 			++stats.misc.shotsFired;
 		}
-		else if (eventName == "Spotted")
-		{
-			for (const auto& nameJson : s_JsonEvent["Value"])
-			{
+		else if (eventName == "Spotted") {
+			for (const auto& nameJson : s_JsonEvent["Value"]) {
 				auto name = nameJson.get<std::string>();
-				Logger::Debug("Spotted by {}", name);
+				auto isTarget = this->IsRepoIdTargetNPC(name);
+
+				Logger::Debug("Spotted by {} - Target: {}", name, isTarget);
+
+				if (isTarget) ++stats.detection.targetsSpottedBy;
 
 				stats.spottedBy.insert(name);
-				stats.detection.uniqueNPCsCaughtBy = static_cast<int>(stats.spottedBy.size());
+				stats.detection.nonTargetsSpottedBy = static_cast<int>(stats.spottedBy.size()) - stats.detection.targetsSpottedBy;
 				++stats.detection.spotted;
 			}
 		}
-		else if (eventName == "Witnesses")
-		{
-			for (const auto& nameJson : s_JsonEvent["Value"])
-			{
+		else if (eventName == "Witnesses") {
+			for (const auto& nameJson : s_JsonEvent["Value"]) {
 				stats.witnesses.insert(nameJson.get<std::string>());
 				++stats.detection.witnesses;
 			}
 		}
-		else if (eventName == "DisguiseBlown")
-		{
+		else if (eventName == "DisguiseBlown") {
 			++stats.misc.disguisesBlown;
 		}
-		else if (eventName == "47_FoundTrespassing")
-		{
+		else if (eventName == "47_FoundTrespassing") {
 			++stats.detection.caughtTrespassing;
 		}
-		else if (eventName == "TargetEliminated")
-		{
-			++stats.kills.targets;
+		else if (eventName == "TargetEliminated") {
+			//++stats.kills.targets; // is this event sent in all target kill cases?
 		}
-		else if (eventName == "Door_Unlocked")
-		{
+		else if (eventName == "Door_Unlocked") {
 			++stats.misc.doorsUnlocked;
 		}
-		else if (eventName == "Pacify")
-		{
+		else if (eventName == "Pacify") {
 			const auto& value = s_JsonEvent["Value"];
 			const auto isTarget = value["IsTarget"].get<bool>();
 			const auto isAccident = value["Accident"].get<bool>();
@@ -756,14 +748,12 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 				if (actorType == EActorType::eAT_Guard) ++stats.pacifies.guard;
 			}
 		}
-		else if (eventName == "CrowdNPC_Died")
-		{
+		else if (eventName == "CrowdNPC_Died") {
 			++stats.kills.total;
 			++stats.kills.nonTargets;
 			++stats.kills.civilian;
 		}
-		else if (eventName == "Kill")
-		{
+		else if (eventName == "Kill") {
 			const auto& value = s_JsonEvent["Value"];
 			const auto repoId = value["RepositoryId"].get<std::string>();
 			const auto isTarget = value["IsTarget"].get<bool>();
@@ -779,9 +769,12 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 			stats.bodies.allHidden = false;
 			++stats.kills.total;
 
-			if (isTarget) stats.bodies.allTargetsHidden = false;
-
-			if (!isTarget) {
+			if (isTarget) {
+				++stats.kills.targets;
+				if (stats.targetsSpottedBy.count(repoId))
+					++stats.detection.targetsSpottedByAndKilled;
+			}
+			else {
 				++stats.kills.nonTargets;
 				if (actorType == EActorType::eAT_Civilian) ++stats.kills.civilian;
 				if (actorType == EActorType::eAT_Guard) ++stats.kills.guard;
@@ -806,33 +799,27 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 				++stats.detection.witnessesKilled;
 			}
 		}
-		else if (eventName == "NoticedKill")
-		{
+		else if (eventName == "NoticedKill") {
 			++stats.kills.noticed;
 		}
-		else if (eventName == "Noticed_Pacified")
-		{
+		else if (eventName == "Noticed_Pacified") {
 			++stats.pacifies.noticed;
 		}
-		else if (eventName == "Unnoticed_Kill")
-		{
+		else if (eventName == "Unnoticed_Kill") {
 			const auto& val = s_JsonEvent["Value"];
 			++stats.kills.unnoticed;
 			if (!val["IsTarget"].get<bool>())
 				++stats.kills.unnoticedNonTarget;
 		}
-		else if (eventName == "Unnoticed_Pacified")
-		{
+		else if (eventName == "Unnoticed_Pacified") {
 			++stats.pacifies.unnoticed;
 			if (!s_JsonEvent["Value"]["IsTarget"].get<bool>()) ++stats.pacifies.unnoticedNonTarget;
 		}
-		else if (eventName == "AmbientChanged")
-		{
+		else if (eventName == "AmbientChanged") {
 			const auto tension = s_JsonEvent["Value"]["AmbientValue"].get<EGameTension>();
 			const auto prevTension = s_JsonEvent["Value"]["PreviousAmbientValue"].get<EGameTension>();
 
-			switch (tension)
-			{
+			switch (tension) {
 			case EGameTension::EGT_Agitated:
 				Logger::Debug("Game tension: agitated - it actually happened!");
 				++stats.tension.agitated;
@@ -861,16 +848,12 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 				stats.tension.level += getTensionValue(tension) - getTensionValue(prevTension);
 			}
 		}
-		else
-		{
-			Logger::Debug("Unhandled Event Sent: {} - {}", eventId, s_EventData);
-		}
+		else Logger::Debug("Unhandled Event Sent: {} - {}", eventId, s_EventData);
 
 		this->UpdateDisplayStats();
 		this->eventHistory.push_back(eventName);
 	}
-	catch (const nlohmann::json::exception& ex)
-	{
+	catch (const nlohmann::json::exception& ex) {
 		Logger::Error("JSON exception: {}", ex.what());
 	}
 

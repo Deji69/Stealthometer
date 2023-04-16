@@ -6,11 +6,14 @@
 #include "Stats.h"
 #include "StatWindow.h"
 
-struct ActorKnowledgeData
+struct ActorData
 {
+	const TEntityRef<ZActor>* ref = nullptr;
+	bool isTarget = false;
 	bool isWitness = false;
 	int highestTensionLevel = 0;
 	ECompiledBehaviorType lastFrameBehaviour;
+	std::string repoId;
 };
 
 enum class StealthometerPlaystyle
@@ -35,6 +38,7 @@ public:
 
 private:
 	auto DrawSettingsUI(bool hasFocus) -> void;
+	auto IsRepoIdTargetNPC(std::string id) -> bool;
 
 private:
 	//DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZGameStatsManager_SendAISignals, ZGameStatsManager* th);
@@ -46,7 +50,7 @@ private:
 	Stats stats;
 	DisplayStats displayStats;
 	StatWindow window;
-	std::array<ActorKnowledgeData, 1000> actorData;
+	std::array<ActorData, 1000> actorData;
 	std::vector<std::string> eventHistory;
 	bool statVisibleUI = false;
 	bool externalWindowEnabled = true;

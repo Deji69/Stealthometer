@@ -91,7 +91,9 @@ struct DetectionStats
 	bool onCamera = false;
 	int spotted = 0;
 	int caughtTrespassing = 0;
-	int uniqueNPCsCaughtBy = 0;
+	int targetsSpottedBy = 0;
+	int targetsSpottedByAndKilled = 0;
+	int nonTargetsSpottedBy = 0;
 	int uniqueNPCsCaughtByAndKilled = 0;
 	int witnesses = 0;
 	int witnessesKilled = 0;
@@ -131,6 +133,7 @@ struct Stats
 {
 	std::set<std::string> witnesses;
 	std::set<std::string> spottedBy;
+	std::set<std::string> targetsSpottedBy;
 	KillStats kills;
 	KillMethodStats killMethods;
 	PacificationStats pacifies;
