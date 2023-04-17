@@ -377,3 +377,4 @@ FodyWeavers.xsd
 
 out/
 CMakeUserPresets.json
+/src/resources.c
