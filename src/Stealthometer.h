@@ -36,7 +36,8 @@ public:
 	auto CalculateStealthRating() -> double;
 
 private:
-	auto DrawSettingsUI(bool hasFocus) -> void;
+	auto DrawSettingsUI(bool focused) -> void;
+	auto DrawExpandedStatsUI(bool focused) -> void;
 	auto IsRepoIdTargetNPC(std::string id) -> bool;
 
 private:
@@ -51,10 +52,15 @@ private:
 	StatWindow window;
 	std::array<ActorData, 1000> actorData;
 	std::vector<std::string> eventHistory;
+	int npcCount = 0;
 	bool statVisibleUI = false;
 	bool externalWindowEnabled = true;
 	bool externalWindowDarkMode = true;
 	bool externalWindowOnTop = false;
+	bool showAllStats = false;
+	bool killsWindowOpen = false;
+	bool pacifiesWindowOpen = false;
+	bool miscWindowOpen = false;
 };
 
 DEFINE_ZHM_PLUGIN(Stealthometer)

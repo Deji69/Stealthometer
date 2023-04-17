@@ -329,6 +329,9 @@ auto Stealthometer::OnFrameUpdate(const SGameUpdateEvent& ev) -> void
 		if (!actorSpatial)
 			continue;
 
+		if (i > this->npcCount)
+			this->npcCount = i;
+
 		if (actor.m_pInterfaceRef->m_nCurrentBehaviorIndex >= 0) {
 			// (&behaviour + 0xD8) = m_pPreviousBehavior ?
 
@@ -365,10 +368,12 @@ auto Stealthometer::OnDrawMenu() -> void
 auto Stealthometer::DrawSettingsUI(bool focused) -> void
 {
 	ImGui::PushFont(SDK()->GetImGuiBlackFont());
-	const auto windowExpanded = ImGui::Begin(ICON_MD_PIE_CHART " STEALTHOMETER", nullptr);
-	ImGui::PushFont(SDK()->GetImGuiRegularFont());
 
-	if (windowExpanded) {
+	ImGui::SetNextWindowSizeConstraints(ImVec2{100, 300}, ImVec2{500, 500});
+
+	if (ImGui::Begin(ICON_MD_SETTINGS " STEALTHOMETER", &this->statVisibleUI, ImGuiWindowFlags_AlwaysAutoResize)) {
+		ImGui::PushFont(SDK()->GetImGuiRegularFont());
+
 		if (ImGui::Checkbox("External Window", &this->externalWindowEnabled)) {
 			if (this->externalWindowEnabled) this->window.create(hInstance);
 			else this->window.destroy();
@@ -378,36 +383,145 @@ auto Stealthometer::DrawSettingsUI(bool focused) -> void
 
 		if (ImGui::Checkbox("External Window On Top", &this->externalWindowOnTop))
 			this->window.setAlwaysOnTop(this->externalWindowOnTop);
+
+		if (ImGui::Button("Kill Stats")) this->killsWindowOpen = true;
+		ImGui::SameLine();
+		if (ImGui::Button("KO Stats")) this->pacifiesWindowOpen = true;
+		if (ImGui::Button("Misc Stats")) this->miscWindowOpen = true;
+
+		ImGui::PopFont();
 	}
 
-	ImGui::PopFont();
 	ImGui::End();
+	ImGui::PopFont();
+}
+
+auto Stealthometer::DrawExpandedStatsUI(bool focused) -> void
+{
+	auto const& stats = this->stats;
+	auto printRow = []<typename T>(const char* label, const char* fmt, T arg) {
+		if (ImGui::TableNextColumn()) ImGui::Text(fmt, arg);
+		if (ImGui::TableNextColumn()) ImGui::TextUnformatted(label);
+	};
+
+	ImGui::PushFont(SDK()->GetImGuiBlackFont());
+
+	if (this->killsWindowOpen) {
+		ImGui::SetNextWindowSizeConstraints(ImVec2 { 250, 200 }, ImVec2 { 600, -1 });
+
+		if (ImGui::Begin(ICON_MD_PIE_CHART " KILLS", &this->killsWindowOpen)) {
+			ImGui::PushFont(SDK()->GetImGuiRegularFont());
+
+			if (ImGui::BeginChild("KillsL", ImVec2{ImGui::GetContentRegionAvail().x * .5f, 115})) {
+				if (ImGui::BeginTable("KillStatsTableL", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_Borders)) {
+					ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, 30);
+					printRow("Guard", "%d", stats.kills.guard);
+					printRow("Target", "%d", stats.kills.targets);
+					printRow("Unnoticed", "%d", stats.kills.unnoticed);
+					printRow("Unnoticed Non-Target", "%d", stats.kills.unnoticedNonTarget);
+				}
+				ImGui::EndTable();
+			}
+
+			ImGui::EndChild();
+			ImGui::SameLine();
+
+			if (ImGui::BeginChild("KillsR", ImVec2{0, 110})) {
+				if (ImGui::BeginTable("KillStatsTableR", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_Borders)) {
+					ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, 30);
+					printRow("Civilian", "%d", stats.kills.civilian);
+					printRow("Non-Target", "%d", stats.kills.nonTargets);
+					printRow("Noticed", "%d", stats.kills.noticed);
+				}
+				ImGui::EndTable();
+			}
+
+			ImGui::EndChild();
+
+			if (ImGui::BeginTable("KillStatsTableT", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_Borders)) {
+				ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, 30);
+				printRow("Total", "%d", stats.kills.total);
+			}
+
+			ImGui::EndTable();
+			ImGui::PopFont();
+		}
+		ImGui::End();
+	}
+
+	if (this->pacifiesWindowOpen) {
+		ImGui::SetNextWindowSizeConstraints(ImVec2 { 250, 200 }, ImVec2 { 600, -1 });
+
+		if (ImGui::Begin(ICON_MD_PIE_CHART " PACIFICATIONS", &this->pacifiesWindowOpen)) {
+			ImGui::PushFont(SDK()->GetImGuiRegularFont());
+
+			if (ImGui::BeginChild("PacificationsL", ImVec2{ImGui::GetContentRegionAvail().x * .5f, 115})) {
+				if (ImGui::BeginTable("KOStatsTableL", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_Borders)) {
+					ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, 30);
+					printRow("Guard", "%d", stats.pacifies.guard);
+					printRow("Target", "%d", stats.pacifies.targets);
+					printRow("Unnoticed", "%d", stats.pacifies.unnoticed);
+					printRow("Unnoticed Non-Target", "%d", stats.pacifies.unnoticedNonTarget);
+				}
+				ImGui::EndTable();
+			}
+			ImGui::EndChild();
+			ImGui::SameLine();
+			if (ImGui::BeginChild("PacificationsR", ImVec2{0, 110})) {
+				if (ImGui::BeginTable("KOStatsTableR", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_Borders)) {
+					ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, 30);
+					printRow("Civilian", "%d", stats.pacifies.civilian);
+					printRow("Non-Target", "%d", stats.pacifies.nonTargets);
+					printRow("Noticed", "%d", stats.pacifies.noticed);
+				}
+				ImGui::EndTable();
+			}
+			ImGui::EndChild();
+			if (ImGui::BeginTable("KOStatsTableT", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_Borders)) {
+				ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, 30);
+				printRow("Total", "%d", stats.pacifies.total);
+			}
+			ImGui::EndTable();
+			ImGui::PopFont();
+		}
+		ImGui::End();
+	}
+
+	if (this->miscWindowOpen) {
+		ImGui::SetNextWindowSizeConstraints(ImVec2 { 250, 200 }, ImVec2 { 600, -1 });
+
+		if (ImGui::Begin(ICON_MD_PIE_CHART " MISC STATS", &this->miscWindowOpen)) {
+			ImGui::PushFont(SDK()->GetImGuiRegularFont());
+
+			if (ImGui::BeginTable("MiscTableL", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_Borders)) {
+				ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, 15);
+				printRow("Agilities", "%d", stats.misc.agilityActions);
+				printRow("Cameras Destroyed", "%d", stats.misc.camerasDestroyed);
+				printRow("Disguises Blown", "%d", stats.misc.disguisesBlown);
+				printRow("Disguises Taken", "%d", stats.misc.disguisesTaken);
+				printRow("Doors Unlocked", "%d", stats.misc.doorsUnlocked);
+				printRow("Items Obtained", "%d", stats.misc.itemsPickedUp);
+				printRow("Items Lost", "%d", stats.misc.itemsRemovedFromInventory);
+				printRow("Items Thrown", "%d", stats.misc.itemsThrown);
+				printRow("Targets Made Sick", "%d", stats.misc.targetsMadeSick);
+				printRow("Times Trespassed", "%d", stats.misc.timesTrespassed);
+			}
+			ImGui::EndTable();
+			ImGui::PopFont();
+		}
+		ImGui::End();
+	}
+
 	ImGui::PopFont();
 }
 
 auto Stealthometer::OnDrawUI(bool focused) -> void
 {
+	this->DrawExpandedStatsUI(focused);
+
 	if (!this->statVisibleUI) return;
 
 	this->DrawSettingsUI(focused);
-
-	/*ImGui::BeginTable("RatingTable", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_ScrollY);
-
-	AcquireSRWLockShared(&this->eventLock);
-
-	for (auto& eventName : this->eventHistory)
-	{
-		ImGui::TableNextRow();
-		ImGui::TableNextColumn();
-		ImGui::TextUnformatted("Test");
-		ImGui::TableNextColumn();
-		ImGui::Text("%lld", eventName);
-	}
-
-	ReleaseSRWLockShared(&this->eventLock);
-
-	ImGui::EndTable();*/
-	
 }
 
 auto Stealthometer::NewContract() -> void
@@ -418,6 +532,7 @@ auto Stealthometer::NewContract() -> void
 
 	this->stats = Stats();
 	this->displayStats = DisplayStats();
+	this->npcCount = 0;
 	this->eventHistory.clear();
 	this->window.update();
 }
