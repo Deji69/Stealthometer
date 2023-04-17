@@ -5,7 +5,7 @@ The statistics can be displayed in their own window and has dark mode support, i
 
 While Hitman 3 has a built-in Silent Assassin tracker already, Stealthometer provides a lot more insight, such as featuring an exact count of bodies found, which can aid development of gameplay strategies by providing details that the game's SA indicator may not.
 
-It also works well with other modes such as **Freelancer** and contract creation (?), as well as supporting offline play, without the need for a server (or server substitute).
+It also works well with other modes such as **Freelancer** and contract creation (?), as well as potentially supporting offline play (confirmation needed - have had mixed results), without the need for a server (or server substitute).
 
 Additionally, this tool aims to support a wide range of potential challenge run ideas such as "all zeroes" and provide enhancements to the existing rating system, with new statistics such as a 'tension' stat (increases with loud play; chaos, panics, etc.) and more to come.
 
@@ -16,6 +16,8 @@ In mind for the future, though not by any means guaranteed.
 - Dynamic 'Stealth Rating'.
 - Play Style system.
 - "Blood Money newspapers" inspired post-mission breakdowns.
+
+Currently a known limitation is lack of saved game support. This could be difficult to resolve as it would require saving files locally, while also keeping track of game saves and knowing when to delete local files.
 
 ## Installation
 
