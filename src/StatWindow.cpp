@@ -256,20 +256,20 @@ auto StatWindow::registerWindowClass(HINSTANCE instance, HWND parentWindow) -> A
 		auto statWindow = reinterpret_cast<StatWindow*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
 
 		switch (msg) {
-			case STEALTHOMETER_CLOSE_WINDOW:
-				break;
-			case WM_DESTROY:
-				break;
-			case WM_NCDESTROY:
-				break;
-			case WM_CREATE:
-				break;
-			case WM_PAINT:
-				statWindow->paint(hwnd);
-				break;
-			case WM_ERASEBKGND:
-				statWindow->paintBg(hwnd, reinterpret_cast<HDC>(wParam));
-				break;
+		case STEALTHOMETER_CLOSE_WINDOW:
+			break;
+		case WM_DESTROY:
+			break;
+		case WM_NCDESTROY:
+			break;
+		case WM_CREATE:
+			break;
+		case WM_PAINT:
+			statWindow->paint(hwnd);
+			break;
+		case WM_ERASEBKGND:
+			statWindow->paintBg(hwnd, reinterpret_cast<HDC>(wParam));
+			break;
 		}
 		return DefWindowProc(hwnd, msg, wParam, lParam);
 	};

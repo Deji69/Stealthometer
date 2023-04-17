@@ -10,7 +10,6 @@ struct ActorData
 {
 	const TEntityRef<ZActor>* ref = nullptr;
 	bool isTarget = false;
-	bool isWitness = false;
 	int highestTensionLevel = 0;
 	ECompiledBehaviorType lastFrameBehaviour;
 	std::string repoId;
@@ -29,8 +28,8 @@ public:
 	auto Init() -> void override;
 	auto OnEngineInitialized() -> void override;
 	auto OnDrawUI(bool hasFocus) -> void override;
-	auto OnFrameUpdate(const SGameUpdateEvent&) -> void;
 	auto OnDrawMenu() -> void override;
+	auto OnFrameUpdate(const SGameUpdateEvent&) -> void;
 
 	auto NewContract() -> void;
 	auto UpdateDisplayStats() -> void;
