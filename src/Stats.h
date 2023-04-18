@@ -115,6 +115,9 @@ struct TensionStats
 struct MiscStats
 {
 	bool suitRetrieved = false;
+	bool recorderErased = false;
+	bool recorderDestroyed = false;
+	bool recordedThenErased = false;
 	int camerasDestroyed = 0;
 	int disguisesTaken = 0;
 	int disguisesBlown = 0;
@@ -129,6 +132,11 @@ struct MiscStats
 	int timesTrespassed = 0;
 };
 
+struct CurrentStats
+{
+	bool trespassing = false;
+};
+
 struct Stats
 {
 	std::set<std::string> witnesses;
@@ -141,5 +149,6 @@ struct Stats
 	BodyStats bodies;
 	DetectionStats detection;
 	TensionStats tension;
+	CurrentStats current;
 	MiscStats misc;
 };

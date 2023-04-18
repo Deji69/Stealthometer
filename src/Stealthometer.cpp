@@ -752,9 +752,11 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 		}
 		else if (eventName == "Actorsick") {
 			++stats.misc.targetsMadeSick;
+			Logger::Debug("ActorSick: {}", s_EventData);
 		}
 		else if (eventName == "Trespassing") {
-			if (s_JsonEvent["Value"]["IsTrespassing"].get<bool>())
+			stats.current.trespassing = s_JsonEvent["Value"]["IsTrespassing"].get<bool>();
+			if (stats.current.trespassing)
 				++stats.misc.timesTrespassed;
 		}
 		else if (eventName == "SecuritySystemRecorder") {
@@ -762,8 +764,12 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 
 			if (val == "spotted")
 				stats.detection.onCamera = true;
-			else if (val == "destroyed" || val == "erased")
+			else if (val == "destroyed" || val == "erased") {
+				if (stats.detection.onCamera) stats.misc.recordedThenErased = true;
 				stats.detection.onCamera = false;
+				if (val == "erased") stats.misc.recorderErased = true;
+				else stats.misc.recorderDestroyed = true;
+			}
 			else if (val == "CameraDestroyed")
 				++stats.misc.camerasDestroyed;
 		}
