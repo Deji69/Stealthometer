@@ -27,7 +27,7 @@ inline const auto playStyleRatings = std::array{
 		return stats.misc.disguisesTaken * 250;
 	}),
 	PlayStyleRating("Method Actor", [](const Stats& stats) {
-		return stats.misc.disguisesTaken * 500 - stats.misc.disguisesBlown * 500;
+		return (stats.misc.disguisesTaken - stats.misc.disguisesBlown) * 500;
 	}),
 	PlayStyleRating("Hacker", [](const Stats& stats) {
 		return stats.misc.recorderErased * 500;
@@ -62,14 +62,10 @@ inline const auto playStyleRatings = std::array{
 		return (
 			stats.spottedBy.size()
 			+ stats.misc.timesTrespassed
-			+ stats.misc.agilityActions
 			+ stats.misc.camerasDestroyed
 			+ stats.misc.disguisesTaken
 			+ stats.misc.itemsThrown
-			+ stats.misc.recorderDestroyed
-			+ stats.misc.recorderErased
 			+ stats.misc.shotsFired
-			+ stats.misc.targetsMadeSick
 			+ stats.kills.total
 			+ stats.pacifies.total
 			+ stats.tension.alertedHigh

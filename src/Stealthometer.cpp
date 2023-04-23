@@ -844,6 +844,10 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 		}
 		else if (eventName == "DisguiseBlown") {
 			++stats.misc.disguisesBlown;
+			stats.current.disguiseBlown = true;
+		}
+		else if (eventName == "BrokenDisguiseCleared") {
+			stats.current.disguiseBlown = false;
 		}
 		else if (eventName == "47_FoundTrespassing") {
 			++stats.detection.caughtTrespassing;

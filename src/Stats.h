@@ -145,6 +145,7 @@ struct CurrentStats
 {
 	EGameTension tension = EGameTension::EGT_Undefined;
 	bool trespassing = false;
+	bool disguiseBlown = false;
 };
 
 struct Stats
