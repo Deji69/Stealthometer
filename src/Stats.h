@@ -2,6 +2,7 @@
 #include <set>
 #include <string>
 #include <Glacier/Enums.h>
+#include "PlayStyleRating.h"
 
 enum class SilentAssassinStatus
 {
@@ -10,6 +11,12 @@ enum class SilentAssassinStatus
 	RedeemableCamera,
 	RedeemableTarget,
 	RedeemableCameraAndTarget,
+};
+
+struct PlayStyle
+{
+	const PlayStyleRating* rating = nullptr;
+	size_t index = 0;
 };
 
 struct DisplayStats
@@ -26,7 +33,7 @@ struct DisplayStats
 	int disguisesBlown = 0;
 	bool recorded = false;
 	bool targetsFound = false;
-	std::string playstyle;
+	PlayStyle playstyle;
 	double stealthRating = 0;
 	SilentAssassinStatus silentAssassin = SilentAssassinStatus::OK;
 };

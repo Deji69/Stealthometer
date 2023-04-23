@@ -1,4 +1,5 @@
 #pragma once
+#include <random>
 #include <vector>
 #include <IPluginInterface.h>
 #include <Glacier/ZEntity.h>
@@ -46,6 +47,7 @@ private:
 	DECLARE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent, ZAchievementManagerSimple* th, uint32_t eventIndex, const ZDynamicObject& ev);
 
 private:
+	std::mt19937 randomGenerator;
 	SRWLOCK eventLock = {};
 	Stats stats;
 	DisplayStats displayStats;

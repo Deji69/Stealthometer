@@ -467,7 +467,8 @@ auto StatWindow::formatStat(Stat stat) -> std::string
 			return std::format("{:g}%", static_cast<double>(static_cast<int>(this->stats.stealthRating * 10)) / 10);
 		}
 		case Stat::PlayStyle: {
-			return this->stats.playstyle;
+			if (!this->stats.playstyle.rating) return ""s;
+			return this->stats.playstyle.rating->getTitle(this->stats.playstyle.index);
 		}
 		case Stat::SilentAssassin:
 			switch (this->stats.silentAssassin) {

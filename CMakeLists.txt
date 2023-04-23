@@ -38,7 +38,7 @@ add_library(Stealthometer SHARED
 	"src/Stealthometer.cpp"
 	"src/Stealthometer.h"
  "src/Stats.h" "src/StatWindow.h" "src/StatWindow.cpp" "src/FixMinMax.h"
- "src/Resources.h")
+ "src/Resources.h" "src/Rating.h" "src/Rating.cpp" "src/PlayStyleRating.h")
 
 target_link_libraries(Stealthometer
 	ZHMModSDK
