@@ -1,6 +1,7 @@
 #pragma once
 #include <set>
 #include <string>
+#include <Glacier/Enums.h>
 
 enum class SilentAssassinStatus
 {
@@ -134,6 +135,7 @@ struct MiscStats
 
 struct CurrentStats
 {
+	EGameTension tension = EGameTension::EGT_Undefined;
 	bool trespassing = false;
 };
 

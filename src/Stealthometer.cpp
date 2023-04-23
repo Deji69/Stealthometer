@@ -656,6 +656,7 @@ auto Stealthometer::UpdateDisplayStats() -> void
 		sa = SilentAssassinStatus::Fail;
 	else if (this->stats.detection.nonTargetsSpottedBy)
 		sa = SilentAssassinStatus::Fail;
+	// TODO: check the target killed was actually who spotted - right now you can kill another target and it says SA
 	else if (this->stats.detection.targetsSpottedBy > this->stats.detection.targetsSpottedByAndKilled)
 		sa = SilentAssassinStatus::RedeemableTarget;
 
@@ -751,7 +752,8 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 			++stats.misc.itemsThrown;
 		}
 		else if (eventName == "Actorsick") {
-			++stats.misc.targetsMadeSick;
+			auto isTarget = s_JsonEvent["Value"]["IsTarget"].get<bool>();
+			if (isTarget) ++stats.misc.targetsMadeSick;
 			Logger::Debug("ActorSick: {}", s_EventData);
 		}
 		else if (eventName == "Trespassing") {
@@ -934,11 +936,14 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 		}
 		else if (eventName == "Unnoticed_Pacified") {
 			++stats.pacifies.unnoticed;
-			if (!s_JsonEvent["Value"]["IsTarget"].get<bool>()) ++stats.pacifies.unnoticedNonTarget;
+			if (!s_JsonEvent["Value"]["IsTarget"].get<bool>())
+				++stats.pacifies.unnoticedNonTarget;
 		}
 		else if (eventName == "AmbientChanged") {
 			const auto tension = s_JsonEvent["Value"]["AmbientValue"].get<EGameTension>();
 			const auto prevTension = s_JsonEvent["Value"]["PreviousAmbientValue"].get<EGameTension>();
+
+			stats.current.tension = tension;
 
 			switch (tension) {
 			case EGameTension::EGT_Agitated:
