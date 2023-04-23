@@ -119,6 +119,7 @@ struct MiscStats
 	bool recorderErased = false;
 	bool recorderDestroyed = false;
 	bool recordedThenErased = false;
+	int agilityActions = 0;
 	int camerasDestroyed = 0;
 	int disguisesTaken = 0;
 	int disguisesBlown = 0;
@@ -128,7 +129,7 @@ struct MiscStats
 	int itemsThrown = 0;
 	int shotsFired = 0;
 	int missedShots = 0;
-	int agilityActions = 0;
+	int setpiecesDestroyed = 0;
 	int targetsMadeSick = 0;
 	int timesTrespassed = 0;
 };

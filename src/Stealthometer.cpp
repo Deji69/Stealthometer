@@ -707,9 +707,6 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 		if (eventName == "ContractStart") {
 			this->NewContract();
 		}
-		else if (eventName == "SetupTarget") {
-			Logger::Debug("SetupTarget: {}", s_EventData);
-		}
 		//eventName == "ItemDestroyed"
 		else if (eventName == "setpieces") {
 			// Blown up propane:
