@@ -93,7 +93,7 @@ auto getBehaviourTension(ECompiledBehaviorType bt)
 		case ECompiledBehaviorType::BT_AgitatedPatrol:
 		case ECompiledBehaviorType::BT_DefendVIP:
 		//case ECompiledBehaviorType::BT_RadioCall:
-		case ECompiledBehaviorType::BT_AlertedStand:
+		//case ECompiledBehaviorType::BT_AlertedStand: // sitting, stands up from distraction
 		case ECompiledBehaviorType::BT_SituationAct:
 		case ECompiledBehaviorType::BT_SituationApproach:
 		case ECompiledBehaviorType::BT_SituationFace:
