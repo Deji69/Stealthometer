@@ -15,11 +15,14 @@
 #include <Glacier/ZSpatialEntity.h>
 #include <Glacier/ZScene.h>
 #include <IconsMaterialDesign.h>
+#include <cmrc/cmrc.hpp>
 
 #include "Stealthometer.h"
 #include "Rating.h"
 #include "json.hpp"
 #include "FixMinMax.h"
+
+CMRC_DECLARE(stealthometer);
 
 HINSTANCE hInstance = nullptr;
 HWND hWnd = nullptr;
