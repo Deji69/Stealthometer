@@ -20,6 +20,7 @@ enum class RatingEventType
 	Trespass,
 };
 
+// TODO: Uhm, something better and easier to balance :/
 inline const auto playStyleRatings = std::array{
 	PlayStyleRating("Reckless", [](const Stats& stats) {
 		return stats.misc.disguisesBlown * 50

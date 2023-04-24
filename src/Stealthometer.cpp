@@ -785,15 +785,11 @@ auto Stealthometer::UpdateDisplayStats() -> void
 		updated = true;
 	}
 
-	//this->displayStats.stealthRating // TODO
-	//this->displayStats.playStyle // TODO
-
 	auto sa = SilentAssassinStatus::OK;
 	if (this->stats.bodies.found || this->stats.kills.nonTargets > 0)
 		sa = SilentAssassinStatus::Fail;
 	else if (this->stats.detection.nonTargetsSpottedBy)
 		sa = SilentAssassinStatus::Fail;
-	// TODO: check the target killed was actually who spotted - right now you can kill another target and it says SA
 	else if (this->stats.detection.targetsSpottedBy > this->stats.detection.targetsSpottedByAndKilled)
 		sa = SilentAssassinStatus::RedeemableTarget;
 
