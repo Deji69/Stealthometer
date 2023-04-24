@@ -1,9 +1,11 @@
 #pragma once
 #include <random>
+#include <unordered_map>
 #include <vector>
 #include <IPluginInterface.h>
 #include <Glacier/ZEntity.h>
 #include <Glacier/ZInput.h>
+#include "json.hpp"
 #include "Stats.h"
 #include "StatWindow.h"
 
@@ -40,6 +42,7 @@ private:
 	auto DrawSettingsUI(bool focused) -> void;
 	auto DrawExpandedStatsUI(bool focused) -> void;
 	auto IsRepoIdTargetNPC(std::string id) -> bool;
+	auto GetRepoEntry(const std::string& id) -> const nlohmann::json*;
 
 private:
 	//DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZGameStatsManager_SendAISignals, ZGameStatsManager* th);
@@ -54,6 +57,8 @@ private:
 	StatWindow window;
 	std::array<ActorData, 1000> actorData;
 	std::vector<std::string> eventHistory;
+	std::mt19937 randomGenerator;
+	std::unordered_map<std::string, nlohmann::json> repo;
 	int npcCount = 0;
 	bool statVisibleUI = false;
 	bool externalWindowEnabled = true;

@@ -56,6 +56,24 @@ auto Stealthometer::Init() -> void
 {
 	InitializeSRWLock(&this->eventLock);
 
+	auto const fs = cmrc::stealthometer::get_filesystem();
+
+	if (!fs.is_file("data/repo.json")) Logger::Error("Stealthometer: repo.json not found in embedde filesystem.");
+	else {
+		auto file = fs.open("data/repo.json");
+		auto repo = nlohmann::json::parse(file.begin(), file.end());
+
+		if (repo.is_array()) {
+			for (auto const& entry : repo) {
+				if (!entry.is_object()) continue;
+				auto id = entry.find("ID_");
+				if (id == entry.end()) continue;
+				this->repo.emplace(id.value().get<std::string>(), entry);
+			}
+		}
+		else Logger::Error("Stealthometer: repo.json invalid.");
+	}
+
 	//Hooks::ZKnowledge_SetGameTension->AddDetour(this, &Stealthometer::ZKnowledge_SetGameTension);
 	Hooks::ZAchievementManagerSimple_OnEventSent->AddDetour(this, &Stealthometer::ZAchievementManagerSimple_OnEventSent);
 	this->window.create(hInstance);
@@ -314,6 +332,15 @@ auto Stealthometer::IsRepoIdTargetNPC(std::string id) -> bool
 		if (id == actor.repoId) return true;
 	}
 	return false;
+}
+
+auto Stealthometer::GetRepoEntry(const std::string& id) -> const nlohmann::json*
+{
+	if (!id.empty()) {
+		auto it = this->repo.find(id);
+		if (it != this->repo.end()) return &it->second;
+	}
+	return nullptr;
 }
 
 auto Stealthometer::OnFrameUpdate(const SGameUpdateEvent& ev) -> void
