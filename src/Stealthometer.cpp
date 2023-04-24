@@ -380,6 +380,9 @@ auto Stealthometer::OnFrameUpdate(const SGameUpdateEvent& ev) -> void
 
 			if (!tension) continue;
 
+			if (behaviourType == ECompiledBehaviorType::BT_CloseCombat)
+				++this->stats.misc.closeCombatEngagements;
+
 			if (tension > actorData.highestTensionLevel) {
 				if (actorData.highestTensionLevel) tension -= actorData.highestTensionLevel;
 				actorData.highestTensionLevel += tension;
@@ -526,6 +529,10 @@ auto Stealthometer::DrawExpandedStatsUI(bool focused) -> void
 
 			if (ImGui::BeginTable("MiscTableL", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_Borders)) {
 				ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, 15);
+				printRow("Recorded", "%s", stats.misc.recordedThenErased || stats.detection.onCamera ? "Yes" : "No");
+				printRow("Recorder Destroyed", "%s", stats.misc.recorderDestroyed ? "Yes" : "No");
+				printRow("Recorder Erased", "%s", stats.misc.recorderErased ? "Yes" : "No");
+				printRow("Suit Retrieved", "%s", stats.misc.suitRetrieved ? "Yes" : "No");
 				printRow("Agilities", "%d", stats.misc.agilityActions);
 				printRow("Cameras Destroyed", "%d", stats.misc.camerasDestroyed);
 				printRow("Disguises Blown", "%d", stats.misc.disguisesBlown);
@@ -534,6 +541,7 @@ auto Stealthometer::DrawExpandedStatsUI(bool focused) -> void
 				printRow("Items Obtained", "%d", stats.misc.itemsPickedUp);
 				printRow("Items Lost", "%d", stats.misc.itemsRemovedFromInventory);
 				printRow("Items Thrown", "%d", stats.misc.itemsThrown);
+				printRow("Setpieces Destroyed", "%d", stats.misc.setpiecesDestroyed);
 				printRow("Targets Made Sick", "%d", stats.misc.targetsMadeSick);
 				printRow("Times Trespassed", "%d", stats.misc.timesTrespassed);
 			}
@@ -566,6 +574,104 @@ auto Stealthometer::NewContract() -> void
 	this->npcCount = 0;
 	this->eventHistory.clear();
 	this->window.update();
+}
+
+auto Stealthometer::CreateItemInfo(const std::string& id) -> ItemInfo
+{
+	ItemInfo item;
+	item.type = ItemInfoType::None;
+	auto entry = this->GetRepoEntry(id);
+	if (entry) {
+		auto itemType = entry->value("ItemType", "");
+		auto inventoryCategoryIcon = entry->value("InventoryCategoryIcon", "");
+		auto itemInfoType = ItemInfoType::Other;
+
+		if (itemType == "eOther_Keycard_A") {
+			itemInfoType = ItemInfoType::Key;
+			++stats.misc.keyItemsPickedUp;
+		}
+		else if (itemType == "eDetonator" && inventoryCategoryIcon == "remote") {
+			itemInfoType = ItemInfoType::Detonator;
+		}
+		else if (itemType == "eCC_Brick") {
+			++stats.misc.itemsPickedUp;
+		}
+		else {
+			++stats.misc.itemsPickedUp;
+
+			if (itemType == "eDetonator" && inventoryCategoryIcon == "distraction")
+				itemInfoType = ItemInfoType::Coin;
+			else if (itemType == "eItemAmmo")
+				itemInfoType = ItemInfoType::AmmoBox;
+			else if (inventoryCategoryIcon == "QuestItem" || inventoryCategoryIcon == "questitem")
+				++stats.misc.intelItemsPickedUp;
+			else if (inventoryCategoryIcon == "poison")
+				itemInfoType = ItemInfoType::Poison;
+			else if (inventoryCategoryIcon == "melee") {
+				if (itemType == "eCC_Knife") itemInfoType = ItemInfoType::LethalMelee;
+				else itemInfoType = ItemInfoType::Melee;
+			}
+			else if (inventoryCategoryIcon == "explosives") {
+				itemInfoType = ItemInfoType::Explosive;
+			}
+			else if (
+				inventoryCategoryIcon == "pistol"
+				|| inventoryCategoryIcon == "smg"
+				|| inventoryCategoryIcon == "shotgun"
+				|| inventoryCategoryIcon == "assaultrifle"
+				|| inventoryCategoryIcon == "sniperrifle"
+			) {
+				itemInfoType = ItemInfoType::Firearm;
+			}
+		}
+
+		switch (itemInfoType) {
+			case ItemInfoType::Detonator: break;
+			default:
+				if (id.empty()) break;
+				item.type = itemInfoType;
+				item.name = entry->value("Title", "");
+				item.commonName = entry->value("CommonName", "");
+				item.itemType = itemType;
+				item.inventoryCategoryIcon = inventoryCategoryIcon;
+				break;
+		}
+	}
+	return item;
+}
+
+auto Stealthometer::AddObtainedItem(const std::string& id, ItemInfo item) -> void
+{
+	if (item.type == ItemInfoType::None) return;
+	if (id.empty()) return;
+	auto it = this->stats.itemsObtained.find(id);
+	if (it != this->stats.itemsObtained.end())
+		++it->second.count;
+	else
+		this->stats.itemsObtained.emplace(id, item);
+}
+
+auto Stealthometer::AddDisposedItem(const std::string& id, ItemInfo item) -> void
+{
+	if (item.type == ItemInfoType::None) return;
+	if (id.empty()) return;
+	auto it = this->stats.itemsDisposed.find(id);
+	if (it != this->stats.itemsDisposed.end())
+		++it->second.count;
+	else
+		this->stats.itemsDisposed.emplace(id, item);
+}
+
+auto Stealthometer::RemoveObtainedItem(const std::string& id) -> int
+{
+	if (id.empty()) return -1;
+	auto it = stats.itemsObtained.find(id);
+	if (it != stats.itemsObtained.end()) {
+		if (it->second.count > 1) return --it->second.count;
+		stats.itemsObtained.erase(it);
+		return 0;
+	}
+	return -1;
 }
 
 auto getTensionValue(EGameTension tension) -> int
@@ -745,12 +851,48 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 		Stats& stats = this->stats;
 
 		if (eventName == "ContractStart") {
+			//s_JsonEvent["Value"]["Loadout"]
 			this->NewContract();
+		}
+		else if (eventName == "StartingSuit") {
+			auto entry = this->GetRepoEntry(s_JsonEvent["Value"]);
+			if (entry) {
+				auto const isSuit = entry->value("IsHitmanSuit", false);
+				this->stats.misc.startedInSuit = isSuit;
+				this->stats.current.inSuit = isSuit;
+			}
 		}
 		//eventName == "ItemDestroyed"
 		else if (eventName == "setpieces") {
+			// Reporter camera destroyed
+			// {"Timestamp":405.325409,"Name":"ItemDestroyed","ContractSessionId":"64e8780e-00bb-45d1-a270-ff1df03082de","ContractId":"00000000-0000-0000-0000-000000000200","Value":{"ItemName":"ActItem_Camera"},"UserId":"00000000-0000-0000-0000-000000000000","SessionId":"","Origin":"gameclient","Id":"9ce9fbf2-e001-42cc-a715-9bae8423285d"}
+
+			// Look at evacuation plan in Paris, basement security room
+			// { "Timestamp":1030.322388, "Name" : "setpieces", "ContractSessionId" : "64e8780e-00bb-45d1-a270-ff1df03082de", "ContractId" : "00000000-0000-0000-0000-000000000200", "Value" : {"RepositoryId":"7093201b-ff82-465f-a187-7245d9057954", "name_metricvalue" : "Paris_Evac_plan", "setpieceHelper_metricvalue" : "Activator_NoTool", "setpieceType_metricvalue" : "DefaultActivators", "toolUsed_metricvalue" : "NA", "Item_triggered_metricvalue" : "NotAvailable", "Position" : "ZDynamicObject::ToString() unknown type: SVector3"}, "UserId" : "00000000-0000-0000-0000-000000000000", "SessionId" : "", "Origin" : "gameclient", "Id" : "bfabe0cf-cb92-4918-a716-b708f3fdc615" }
+			// { "Timestamp":1030.836670, "Name" : "setpieces", "ContractSessionId" : "64e8780e-00bb-45d1-a270-ff1df03082de", "ContractId" : "00000000-0000-0000-0000-000000000200", "Value" : {"RepositoryId":"7093201b-ff82-465f-a187-7245d9057954", "name_metricvalue" : "Paris_Evac_plan", "setpieceHelper_metricvalue" : "Activator_NoTool", "setpieceType_metricvalue" : "DefaultActivators", "toolUsed_metricvalue" : "NA", "Item_triggered_metricvalue" : "NotAvailable", "Position" : "ZDynamicObject::ToString() unknown type: SVector3"}, "UserId" : "00000000-0000-0000-0000-000000000000", "SessionId" : "", "Origin" : "gameclient", "Id" : "39f70b5d-8689-47bd-a765-a73067bd737d" }
+			
+			// Piano lid pushed down
+			// {"Timestamp":75.528625,"Name":"setpieces","ContractSessionId":"64e8780e-00bb-45d1-a270-ff1df03082de","ContractId":"00000000-0000-0000-0000-000000000200","Value":{"RepositoryId":"db6a820c-22ea-496e-a0f2-6823b32a911d","name_metricvalue":"Trap_Piano","setpieceHelper_metricvalue":"Activator_NoTool","setpieceType_metricvalue":"DefaultActivators","toolUsed_metricvalue":"NA","Item_triggered_metricvalue":"NotAvailable","Position":"ZDynamicObject::ToString() unknown type: SVector3"},"UserId":"00000000-0000-0000-0000-000000000000","SessionId":"","Origin":"gameclient","Id":"7260ec0d-98da-4aa1-b2e5-e2ad74d18db3"}
+			// { "Timestamp":75.629402, "Name" : "setpieces", "ContractSessionId" : "64e8780e-00bb-45d1-a270-ff1df03082de", "ContractId" : "00000000-0000-0000-0000-000000000200", "Value" : {"RepositoryId":"db6a820c-22ea-496e-a0f2-6823b32a911d", "name_metricvalue" : "Trap_Piano", "setpieceHelper_metricvalue" : "Activator_NoTool", "setpieceType_metricvalue" : "DefaultActivators", "toolUsed_metricvalue" : "NA", "Item_triggered_metricvalue" : "NotAvailable", "Position" : "ZDynamicObject::ToString() unknown type: SVector3"}, "UserId" : "00000000-0000-0000-0000-000000000000", "SessionId" : "", "Origin" : "gameclient", "Id" : "0fdcc023-01f6-4a15-b2f5-2c786ddf47fe" }
+			// { "Timestamp":76.096695, "Name" : "setpieces", "ContractSessionId" : "64e8780e-00bb-45d1-a270-ff1df03082de", "ContractId" : "00000000-0000-0000-0000-000000000200", "Value" : {"RepositoryId":"ab388850-d6cc-4e5c-a4a2-76bb22ca8f73", "name_metricvalue" : "NotAvailable", "setpieceHelper_metricvalue" : "DistractionLogic", "setpieceType_metricvalue" : "DistractionTriggered", "toolUsed_metricvalue" : "NA", "Item_triggered_metricvalue" : "NotAvailable", "Position" : "ZDynamicObject::ToString() unknown type: SVector3"}, "UserId" : "00000000-0000-0000-0000-000000000000", "SessionId" : "", "Origin" : "gameclient", "Id" : "26758af1-b9f6-4892-b33c-644bf2522a02" }
+
+			// Loudspeaker shot down
+			// {"Timestamp":110.426361,"Name":"setpieces","ContractSessionId":"64e8780e-00bb-45d1-a270-ff1df03082de","ContractId":"00000000-0000-0000-0000-000000000200","Value":{"RepositoryId":"2d7a91b9-1b3a-4db3-a8bf-6249db70c339","name_metricvalue":"Loudspeaker","setpieceHelper_metricvalue":"SuspendedObject","setpieceType_metricvalue":"trap","toolUsed_metricvalue":"NA","Item_triggered_metricvalue":"NA","Position":"ZDynamicObject::ToString() unknown type: SVector3"},"UserId":"00000000-0000-0000-0000-000000000000","SessionId":"","Origin":"gameclient","Id":"744fbb86-b8d1-47e0-b206-fa79b80b259f"}
+
+			// Car blown up
+			// {"Timestamp":340.653961,"Name":"setpieces","ContractSessionId":"64e8780e-00bb-45d1-a270-ff1df03082de","ContractId":"00000000-0000-0000-0000-000000000200","Value":{"RepositoryId":"2b29d641-2a0d-4781-b2dd-0df02bc2674b","name_metricvalue":"NotAvailable","setpieceHelper_metricvalue":"PropHelper_Explosion","setpieceType_metricvalue":"trap","toolUsed_metricvalue":"Exploded","Item_triggered_metricvalue":"NotAvailable","Position":"ZDynamicObject::ToString() unknown type: SVector3"},"UserId":"00000000-0000-0000-0000-000000000000","SessionId":"","Origin":"gameclient","Id":"1233f4a1-fafc-43db-a746-972af85d28dc"}
+
+			// Fuse box turned off
+			// {"Timestamp":35.705559,"Name":"setpieces","ContractSessionId":"3b541fce-5498-42bd-b853-b07526a07593","ContractId":"00000000-0000-0000-0000-000000000200","Value":{"RepositoryId":"e29d8ce5-64d6-4207-a55d-ebe5e84b16b3","name_metricvalue":"NotAvailable","setpieceHelper_metricvalue":"Activator_NoTool","setpieceType_metricvalue":"DefaultActivators","toolUsed_metricvalue":"NA","Item_triggered_metricvalue":"NotAvailable","Position":"ZDynamicObject::ToString() unknown type: SVector3"},"UserId":"00000000-0000-0000-0000-000000000000","SessionId":"","Origin":"gameclient","Id":"72ea0e72-4c48-4980-9341-c07c5000b7d4"}
+			// { "Timestamp":35.839172, "Name" : "setpieces", "ContractSessionId" : "3b541fce-5498-42bd-b853-b07526a07593", "ContractId" : "00000000-0000-0000-0000-000000000200", "Value" : {"RepositoryId":"e29d8ce5-64d6-4207-a55d-ebe5e84b16b3", "name_metricvalue" : "NotAvailable", "setpieceHelper_metricvalue" : "Activator_NoTool", "setpieceType_metricvalue" : "DefaultActivators", "toolUsed_metricvalue" : "NA", "Item_triggered_metricvalue" : "NotAvailable", "Position" : "ZDynamicObject::ToString() unknown type: SVector3"}, "UserId" : "00000000-0000-0000-0000-000000000000", "SessionId" : "", "Origin" : "gameclient", "Id" : "88fc03bf-2fc4-466d-9356-1c74210cace4" }
+
 			// Blown up propane:
 			// {"Timestamp":136.863831,"Name":"setpieces","ContractSessionId":"2517213287667595942-d688bab6-034a-488b-a483-89cfac74656f","ContractId":"00000000-0000-0000-0000-000000000400","Value":{"RepositoryId":"2b29d641-2a0d-4781-b2dd-0df02bc2674b","name_metricvalue":"PropaneFlask","setpieceHelper_metricvalue":"PropHelper_Explosion","setpieceType_metricvalue":"trap","toolUsed_metricvalue":"Exploded","Item_triggered_metricvalue":"NotAvailable","Position":"ZDynamicObject::ToString() unknown type: SVector3"},"UserId":"b1585b4d-36f0-48a0-8ffa-1b72f01759da","SessionId":"61e82efa0bcb4a3088825dd75e115f61-2714020697","Origin":"gameclient","Id":"4dcd73fe-7d2c-443b-aeac-10cd279ec971"}
+
+			// Flooded sink:
+			// {"Timestamp":219.718857,"Name":"setpieces","ContractSessionId":"01e7cfb4-0c1d-4d6e-99dc-9a604f9e1be0","ContractId":"00000000-0000-0000-0000-000000000200","Value":{"RepositoryId":"95e7e530-dbd0-4e1a-95f6-8d5c165a7991","name_metricvalue":"NotAvailable","setpieceHelper_metricvalue":"Activator_NoTool","setpieceType_metricvalue":"DefaultActivators","toolUsed_metricvalue":"NA","Item_triggered_metricvalue":"NotAvailable","Position":"ZDynamicObject::ToString() unknown type: SVector3"},"UserId":"00000000-0000-0000-0000-000000000000","SessionId":"","Origin":"gameclient","Id":"c9b351ed-80ac-47c9-a73d-9fcd61c49ca5"}
+			// { "Timestamp":220.185089, "Name" : "setpieces", "ContractSessionId" : "01e7cfb4-0c1d-4d6e-99dc-9a604f9e1be0", "ContractId" : "00000000-0000-0000-0000-000000000200", "Value" : {"RepositoryId":"95e7e530-dbd0-4e1a-95f6-8d5c165a7991", "name_metricvalue" : "NotAvailable", "setpieceHelper_metricvalue" : "Activator_NoTool", "setpieceType_metricvalue" : "DefaultActivators", "toolUsed_metricvalue" : "NA", "Item_triggered_metricvalue" : "NotAvailable", "Position" : "ZDynamicObject::ToString() unknown type: SVector3"}, "UserId" : "00000000-0000-0000-0000-000000000000", "SessionId" : "", "Origin" : "gameclient", "Id" : "e40d4a1c-5c02-4431-a784-b0e944cf7ae4" }
+			// { "Timestamp":224.197235, "Name" : "setpieces", "ContractSessionId" : "01e7cfb4-0c1d-4d6e-99dc-9a604f9e1be0", "ContractId" : "00000000-0000-0000-0000-000000000200", "Value" : {"RepositoryId":"3678cc55-c327-4e79-ab1b-52553c58ec83", "name_metricvalue" : "NotAvailable", "setpieceHelper_metricvalue" : "DistractionLogic", "setpieceType_metricvalue" : "DistractionTriggered", "toolUsed_metricvalue" : "NA", "Item_triggered_metricvalue" : "NotAvailable", "Position" : "ZDynamicObject::ToString() unknown type: SVector3"}, "UserId" : "00000000-0000-0000-0000-000000000000", "SessionId" : "", "Origin" : "gameclient", "Id" : "97285361-ceb7-4f3c-a9e9-0e4352aa70c8" }
 			
 			// Shot down Shisha sign:
 			// {"Timestamp":6.376209,"Name":"setpieces","ContractSessionId":"2517213287667595942-d688bab6-034a-488b-a483-89cfac74656f","ContractId":"00000000-0000-0000-0000-000000000400","Value":{"RepositoryId":"2d7a91b9-1b3a-4db3-a8bf-6249db70c339","name_metricvalue":"\n\n","setpieceHelper_metricvalue":"SuspendedObject","setpieceType_metricvalue":"trap","toolUsed_metricvalue":"NA","Item_triggered_metricvalue":"NA","Position":"ZDynamicObject::ToString() unknown type : SVector3"},"UserId":"b1585b4d - 36f0 - 48a0 - 8ffa - 1b72f01759da","SessionId":"61e82efa0bcb4a3088825dd75e115f61 - 2714020697","Origin":"gameclient","Id":"46904050 - dd0b - 406f - a8ea - 8d56cbbca556"}
@@ -779,13 +921,39 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 			Logger::Info("Setpiece: {}", s_EventData);
 		}
 		else if (eventName == "ItemPickedUp") {
-			++stats.misc.itemsPickedUp;
+			auto id = s_JsonEvent["Value"]["RepositoryId"].get<std::string>();
+			auto it = stats.itemsObtained.find(id);
+			if (it != stats.itemsObtained.end()) {
+				++it->second.count;
+			}
+			else {
+				auto item = this->CreateItemInfo(id);
+				if (item.type != ItemInfoType::None)
+					stats.itemsObtained.emplace(id, item);
+			}
 		}
 		else if (eventName == "ItemRemovedFromInventory") {
 			++stats.misc.itemsRemovedFromInventory;
+
+			this->RemoveObtainedItem(s_JsonEvent["Value"]["RepositoryId"].get<std::string>());
+		}
+		else if (eventName == "ItemDropped") {
+			++stats.misc.itemsDropped;
+
+			auto id = s_JsonEvent["Value"]["RepositoryId"].get<std::string>();
+			if (!id.empty()) {
+				this->RemoveObtainedItem(id);
+				auto item = this->CreateItemInfo(id);
+				this->AddDisposedItem(id, item);
+			}
 		}
 		else if (eventName == "ItemThrown") {
+			// inventory removal handled in ItemRemovedFromInventory
 			++stats.misc.itemsThrown;
+
+			auto id = s_JsonEvent["Value"]["RepositoryId"].get<std::string>();
+			auto item = this->CreateItemInfo(id);
+			this->AddDisposedItem(id, item);
 		}
 		else if (eventName == "Actorsick") {
 			auto isTarget = s_JsonEvent["Value"]["IsTarget"].get<bool>();
@@ -805,7 +973,7 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 			else if (val == "destroyed" || val == "erased") {
 				if (stats.detection.onCamera) stats.misc.recordedThenErased = true;
 				stats.detection.onCamera = false;
-				if (val == "erased") stats.misc.recorderErased = true;
+				if (val == "erased" && !stats.misc.recorderDestroyed) stats.misc.recorderErased = true;
 				else stats.misc.recorderDestroyed = true;
 			}
 			else if (val == "CameraDestroyed")
@@ -832,7 +1000,13 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 		}
 		else if (eventName == "Disguise") {
 			++stats.misc.disguisesTaken;
-			// TODO: suit retrieval?
+			stats.misc.suitRetrieved = false;
+
+			auto entry = this->GetRepoEntry(s_JsonEvent["Value"].get<std::string>());
+			if (entry) {
+				auto isHitmanSuit = entry->value("IsHitmanSuit", false);
+				if (isHitmanSuit) stats.misc.suitRetrieved = true;
+			}
 		}
 		else if (eventName == "SituationContained") {
 			++stats.detection.situationsContained;
@@ -924,6 +1098,7 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 			const auto actorType = value["ActorType"].get<EActorType>();
 			const auto killClass = value["KillClass"].get<std::string>();
 			const auto killMethodBroad = value["KillMethodBroad"].get<std::string>();
+			const auto killMethodStrict = value["KillMethodStrict"].get<std::string>();
 			const auto isWeaponSilenced = value["WeaponSilenced"].get<bool>();
 
 			const auto killItemCategoryIt = value.find("KillItemCategory");
@@ -943,15 +1118,74 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 				if (actorType == EActorType::eAT_Guard) ++stats.kills.guard;
 			}
 
-			if (value["IsHeadshot"].get<bool>()) ++stats.killMethods.headshot;
-			if (killClass == "melee") ++stats.killMethods.melee;
-			if (killMethodBroad == "throw") ++stats.killMethods.thrown;
-			if (isWeaponSilenced) ++stats.killMethods.silencedWeapon;
+			if (value["IsHeadshot"].get<bool>()) {
+				++stats.killMethods.headshot;
+				if (isTarget) ++stats.killMethods.headshotTarget;
+			}
 
-			if (isAccident) ++stats.killMethods.accident;
+			if (killClass == "melee") {
+				++stats.killMethods.melee;
+				if (isTarget) ++stats.killMethods.meleeTarget;
+			}
 
-			if (killItemCategory == "pistol")
+			if (killMethodBroad == "throw") {
+				++stats.killMethods.thrown;
+				if (isTarget) ++stats.killMethods.thrownTarget;
+			}
+			else if (killMethodBroad == "unarmed") {
+				++stats.killMethods.unarmed;
+				if (isTarget) ++stats.killMethods.unarmedTarget;
+			}
+			else if (killMethodBroad == "pistol") {
 				++stats.killMethods.pistol;
+				if (isTarget) ++stats.killMethods.pistolTarget;
+			}
+			else if (killMethodBroad == "smg") {
+				++stats.killMethods.smg;
+				if (isTarget) ++stats.killMethods.smgTarget;
+			}
+			else if (killMethodBroad == "shotgun") {
+				++stats.killMethods.shotgun;
+				if (isTarget) ++stats.killMethods.shotgunTarget;
+			}
+			else if (killMethodBroad == "close_combat_pistol_elimination") {
+				++stats.killMethods.pistolElim;
+				if (isTarget) ++stats.killMethods.pistolElimTarget;
+			}
+
+			if (isAccident) {
+				++stats.killMethods.accident;
+				if (isTarget) ++stats.killMethods.accidentTarget;
+
+				if (killMethodStrict == "accident_drown") {
+					++stats.killMethods.drown;
+					if (isTarget) ++stats.killMethods.drownTarget;
+				}
+				else if (killMethodStrict == "accident_push") {
+					++stats.killMethods.push;
+					if (isTarget) ++stats.killMethods.pushTarget;
+				}
+				else if (killMethodStrict == "accident_burn") {
+					++stats.killMethods.burn;
+					if (isTarget) ++stats.killMethods.burnTarget;
+				}
+				else if (killMethodStrict == "accident_explosion") {
+					++stats.killMethods.accidentExplosion;
+					if (isTarget) ++stats.killMethods.accidentExplosionTarget;
+				}
+				else if (killMethodStrict == "accident_suspended_object") {
+					++stats.killMethods.fallingObject;
+					if (isTarget) ++stats.killMethods.fallingObjectTarget;
+				}
+				else if (killMethodStrict.size()) {
+					Logger::Info("Stealthometer: Unhandled KillMethodStrict '{}'", killMethodStrict);
+				}
+			}
+
+			if (isWeaponSilenced) {
+				++stats.killMethods.silencedWeapon;
+				if (isTarget) ++stats.killMethods.silencedWeaponTarget;
+			}
 
 			if (stats.spottedBy.count(repoId))
 				++stats.detection.uniqueNPCsCaughtByAndKilled;
@@ -971,7 +1205,9 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 		else if (eventName == "Unnoticed_Kill") {
 			const auto& val = s_JsonEvent["Value"];
 			++stats.kills.unnoticed;
-			if (!val["IsTarget"].get<bool>())
+			if (val["IsTarget"].get<bool>())
+				++stats.kills.unnoticedTarget;
+			else
 				++stats.kills.unnoticedNonTarget;
 		}
 		else if (eventName == "Unnoticed_Pacified") {

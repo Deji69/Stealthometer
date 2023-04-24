@@ -2,6 +2,7 @@
 #include <array>
 #include "PlayStyleRating.h"
 #include "Stats.h"
+#include "FixMinMax.h"
 
 enum class RatingEventType
 {
@@ -20,17 +21,96 @@ enum class RatingEventType
 };
 
 inline const auto playStyleRatings = std::array{
+	PlayStyleRating("Reckless", [](const Stats& stats) {
+		return stats.misc.disguisesBlown * 50
+			+ stats.kills.nonTargets * 30
+			+ stats.kills.noticed * 30
+			+ stats.detection.spotted * 20
+			+ stats.detection.onCamera * 20;
+	}),
 	PlayStyleRating("Bad Actor", [](const Stats& stats) {
-		return stats.misc.disguisesBlown * 500;
+		return stats.misc.disguisesBlown * 250;
 	}),
 	PlayStyleRating("Chameleon", [](const Stats& stats) {
-		return stats.misc.disguisesTaken * 250;
+		return stats.misc.disguisesTaken * 200;
 	}),
 	PlayStyleRating("Method Actor", [](const Stats& stats) {
-		return (stats.misc.disguisesTaken - stats.misc.disguisesBlown) * 500;
+		if (stats.misc.disguisesBlown) return 0;
+		return stats.misc.disguisesTaken * 250;
+	}),
+	PlayStyleRating("Boxer", [](const Stats& stats) {
+		return stats.misc.closeCombatEngagements * 350;
+	}),
+	PlayStyleRating("Criminal", [](const Stats& stats) {
+		if (!stats.tension.arrest && !stats.tension.combat && !stats.tension.alertedHigh) return 0;
+		return std::min(stats.detection.spotted, 3) * 250;
+	}),
+	PlayStyleRating("Terrorist", [](const Stats& stats) {
+		return stats.tension.level * 6;
 	}),
 	PlayStyleRating("Hacker", [](const Stats& stats) {
-		return stats.misc.recorderErased * 500;
+		return stats.misc.recorderErased * 300;
+	}),
+	PlayStyleRating("Locksmith", [](const Stats& stats) {
+		return stats.misc.doorsUnlocked * 50;
+	}),
+	PlayStyleRating("Infiltrator", [](const Stats& stats) {
+		return stats.misc.doorsUnlocked * 25
+			+ stats.misc.agilityActions * 25
+			+ stats.misc.timesTrespassed * 25;
+	}),
+	PlayStyleRating("Spy", [](const Stats& stats) {
+		int count = 0;
+		for (auto const& item : stats.itemsObtained) {
+			switch (item.second.type) {
+			case ItemInfoType::Intel:
+				++count;
+				break;
+			default: break;
+			}
+		}
+		return count * 200;
+	}),
+	PlayStyleRating("Hoarder", [](const Stats& stats) {
+		int count = 0;
+		for (auto const& item : stats.itemsObtained) {
+			switch (item.second.type) {
+			case ItemInfoType::AmmoBox:
+			case ItemInfoType::Briefcase:
+			case ItemInfoType::Detonator:
+			case ItemInfoType::Intel:
+			case ItemInfoType::Key:
+				break;
+			default:
+				++count;
+				break;
+			}
+		}
+		if (count < 5) return 0;
+		return count * 50;
+	}),
+	PlayStyleRating("Thief", [](const Stats& stats) {
+		int count = 0;
+		for (auto const& item : stats.itemsObtained) {
+			switch (item.second.type) {
+			case ItemInfoType::Briefcase:
+			case ItemInfoType::Detonator:
+			case ItemInfoType::Intel:
+				break;
+			default:
+				++count;
+				break;
+			}
+		}
+		if (!count) return 0;
+		return count * 50 + stats.misc.doorsUnlocked * 25;
+	}),
+	PlayStyleRating("Litterer", [](const Stats& stats) {
+		return static_cast<int>(stats.itemsDisposed
+		.size() - stats.itemsObtained.size()) * 40;
+	}),
+	PlayStyleRating("Executioner", [](const Stats& stats) {
+		return stats.kills.noticed * 60;
 	}),
 	PlayStyleRating("Murderer", [](const Stats& stats) {
 		if (stats.kills.total >= 47) return 0;

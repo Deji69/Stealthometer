@@ -43,6 +43,10 @@ private:
 	auto DrawExpandedStatsUI(bool focused) -> void;
 	auto IsRepoIdTargetNPC(std::string id) -> bool;
 	auto GetRepoEntry(const std::string& id) -> const nlohmann::json*;
+	auto CreateItemInfo(const std::string& repoId) -> ItemInfo;
+	auto AddObtainedItem(const std::string& id, ItemInfo item) -> void;
+	auto RemoveObtainedItem(const std::string& id) -> int;
+	auto AddDisposedItem(const std::string& id, ItemInfo item) -> void;
 
 private:
 	//DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZGameStatsManager_SendAISignals, ZGameStatsManager* th);
@@ -50,7 +54,6 @@ private:
 	DECLARE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent, ZAchievementManagerSimple* th, uint32_t eventIndex, const ZDynamicObject& ev);
 
 private:
-	std::mt19937 randomGenerator;
 	SRWLOCK eventLock = {};
 	Stats stats;
 	DisplayStats displayStats;
