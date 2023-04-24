@@ -785,6 +785,7 @@ auto Stealthometer::UpdateDisplayStats() -> void
 		updated = true;
 	}
 
+	// Silent Assassin Status
 	auto sa = SilentAssassinStatus::OK;
 	if (this->stats.bodies.found || this->stats.kills.nonTargets > 0)
 		sa = SilentAssassinStatus::Fail;
@@ -803,12 +804,14 @@ auto Stealthometer::UpdateDisplayStats() -> void
 		updated = true;
 	}
 
+	// Stealth Rating
 	auto rating = this->CalculateStealthRating();
 	if (static_cast<int>(rating * 100) != static_cast<int>(this->displayStats.stealthRating * 100)) {
 		this->displayStats.stealthRating = rating;
 		updated = true;
 	}
 
+	// Play Style
 	auto playStyleRating = getPlayStyleRating(stats);
 	if (playStyleRating) {
 		if (playStyleRating != this->displayStats.playstyle.rating) {

@@ -107,8 +107,7 @@ inline const auto playStyleRatings = std::array{
 		return count * 50 + stats.misc.doorsUnlocked * 25;
 	}),
 	PlayStyleRating("Litterer", [](const Stats& stats) {
-		return static_cast<int>(stats.itemsDisposed
-		.size() - stats.itemsObtained.size()) * 40;
+		return static_cast<int>(stats.itemsDisposed.size() - stats.itemsObtained.size()) * 40;
 	}),
 	PlayStyleRating("Executioner", [](const Stats& stats) {
 		return stats.kills.noticed * 60;
@@ -122,7 +121,7 @@ inline const auto playStyleRatings = std::array{
 		if (stats.detection.witnesses > stats.detection.witnessesKilled) return 0;
 		return stats.kills.total * 60;
 	}),
-	PlayStyleRating({"Mass Murderer", "Psychopath", "Terrorist"}, [](const Stats& stats) {
+	PlayStyleRating({"Mass Murderer", "Psychopath"}, [](const Stats& stats) {
 		if (stats.kills.total < 47) return 0;
 		return stats.kills.nonTargets * 50;
 	}),
