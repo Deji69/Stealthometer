@@ -140,8 +140,10 @@ struct BodyStats
 	int found = 0;
 	int foundAccidents = 0;
 	int foundMurdered = 0;
+	int foundMurderedByNonTarget = 0;
 	int foundCrowd = 0;
 	int foundCrowdMurders = 0;
+	int targetBodyWitnessesKilled = 0;
 	int deadSeen = 0;
 	int targetsFound = 0;
 	int bagged = 0;
@@ -152,7 +154,6 @@ struct DetectionStats
 	bool onCamera = false;
 	int spotted = 0;
 	int caughtTrespassing = 0;
-	int targetsSpottedBy = 0;
 	int targetsSpottedByAndKilled = 0;
 	int nonTargetsSpottedBy = 0;
 	int uniqueNPCsCaughtByAndKilled = 0;
@@ -192,7 +193,6 @@ struct MiscStats
 	int itemsDropped = 0;
 	int itemsThrown = 0;
 	int keyItemsPickedUp = 0;
-	int shotsFired = 0;
 	int missedShots = 0;
 	int objectsDestroyed = 0;
 	int setpiecesDestroyed = 0;
@@ -214,6 +214,8 @@ struct Stats
 	std::set<std::string> witnesses;
 	std::set<std::string> spottedBy;
 	std::set<std::string> targetsSpottedBy;
+	std::set<std::string> targetBodyWitnesses;
+	std::set<std::string> disguisesBlown;
 	std::map<std::string, ItemInfo> itemsObtained;
 	std::map<std::string, ItemInfo> itemsDisposed;
 	KillStats kills;

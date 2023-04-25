@@ -535,7 +535,7 @@ auto Stealthometer::DrawExpandedStatsUI(bool focused) -> void
 				printRow("Suit Retrieved", "%s", stats.misc.suitRetrieved ? "Yes" : "No");
 				printRow("Agilities", "%d", stats.misc.agilityActions);
 				printRow("Cameras Destroyed", "%d", stats.misc.camerasDestroyed);
-				printRow("Disguises Blown", "%d", stats.misc.disguisesBlown);
+				printRow("Disguises Blown", "%d", stats.disguisesBlown.size());
 				printRow("Disguises Taken", "%d", stats.misc.disguisesTaken);
 				printRow("Doors Unlocked", "%d", stats.misc.doorsUnlocked);
 				printRow("Items Obtained", "%d", stats.misc.itemsPickedUp);
@@ -725,8 +725,8 @@ auto Stealthometer::UpdateDisplayStats() -> void
 	}
 
 	// Spotted
-	if (this->displayStats.spotted != (this->stats.detection.targetsSpottedBy + this->stats.detection.nonTargetsSpottedBy)) {
-		this->displayStats.spotted = this->stats.detection.targetsSpottedBy + this->stats.detection.nonTargetsSpottedBy;
+	if (this->displayStats.spotted != (this->stats.targetsSpottedBy.size() + this->stats.detection.nonTargetsSpottedBy)) {
+		this->displayStats.spotted = this->stats.targetsSpottedBy.size() + this->stats.detection.nonTargetsSpottedBy;
 		updated = true;
 	}
 
@@ -773,8 +773,8 @@ auto Stealthometer::UpdateDisplayStats() -> void
 	}
 
 	// Disguises Blown
-	if (this->displayStats.disguisesBlown != this->stats.misc.disguisesBlown) {
-		this->displayStats.disguisesBlown = this->stats.misc.disguisesBlown;
+	if (this->displayStats.disguisesBlown != this->stats.disguisesBlown.size()) {
+		this->displayStats.disguisesBlown = this->stats.disguisesBlown.size();
 		updated = true;
 	}
 
@@ -787,12 +787,15 @@ auto Stealthometer::UpdateDisplayStats() -> void
 
 	// Silent Assassin Status
 	auto sa = SilentAssassinStatus::OK;
-	if (this->stats.bodies.found || this->stats.kills.nonTargets > 0)
+
+	if (this->stats.kills.nonTargets > 0 || this->stats.bodies.foundMurderedByNonTarget || this->stats.detection.nonTargetsSpottedBy > 0)
 		sa = SilentAssassinStatus::Fail;
-	else if (this->stats.detection.nonTargetsSpottedBy)
-		sa = SilentAssassinStatus::Fail;
-	else if (this->stats.detection.targetsSpottedBy > this->stats.detection.targetsSpottedByAndKilled)
-		sa = SilentAssassinStatus::RedeemableTarget;
+
+	if (sa != SilentAssassinStatus::Fail) {
+		if (this->stats.targetBodyWitnesses.size() > this->stats.bodies.targetBodyWitnessesKilled
+			|| this->stats.targetsSpottedBy.size() > this->stats.detection.targetsSpottedByAndKilled)
+			sa = SilentAssassinStatus::RedeemableTarget;
+	}
 
 	if (this->stats.detection.onCamera) {
 		if (sa == SilentAssassinStatus::OK) sa = SilentAssassinStatus::RedeemableCamera;
@@ -920,15 +923,20 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 			Logger::Info("Setpiece: {}", s_EventData);
 		}
 		else if (eventName == "ItemPickedUp") {
-			auto id = s_JsonEvent["Value"]["RepositoryId"].get<std::string>();
-			auto it = stats.itemsObtained.find(id);
-			if (it != stats.itemsObtained.end()) {
-				++it->second.count;
-			}
-			else {
-				auto item = this->CreateItemInfo(id);
-				if (item.type != ItemInfoType::None)
-					stats.itemsObtained.emplace(id, item);
+			// TODO: bit of a hacky workaround to fix Freelancer loadout items counting as picked up
+			// ignore any items picked up in the first 3 seconds
+			auto time = s_JsonEvent["Timestamp"].get<float>();
+			if (time > 3.0) {
+				auto id = s_JsonEvent["Value"]["RepositoryId"].get<std::string>();
+				auto it = stats.itemsObtained.find(id);
+				if (it != stats.itemsObtained.end()) {
+					++it->second.count;
+				}
+				else {
+					auto item = this->CreateItemInfo(id);
+					if (item.type != ItemInfoType::None)
+						stats.itemsObtained.emplace(id, item);
+				}
 			}
 		}
 		else if (eventName == "ItemRemovedFromInventory") {
@@ -988,9 +996,17 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 			++stats.bodies.deadSeen;
 		}
 		else if (eventName == "MurderedBodySeen") {
+			auto const& value = s_JsonEvent["Value"];
+			auto const& deadBody = value["DeadBody"];
+			auto const witnessId = value["Witness"].get<std::string>();
+			auto const isTarget = value.value("IsWitnessTarget", false);
 			++stats.bodies.foundMurdered;
-			if (s_JsonEvent["Value"]["DeadBody"]["IsCrowdActor"].get<bool>())
+			if (deadBody["IsCrowdActor"].get<bool>())
 				++stats.bodies.foundCrowdMurders;
+			if (isTarget)
+				stats.targetBodyWitnesses.insert(witnessId);
+			else
+				++stats.bodies.foundMurderedByNonTarget;
 		}
 		else if (eventName == "BodyFound") {
 			++stats.bodies.found;
@@ -1032,11 +1048,16 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 
 				Logger::Debug("Spotted by {} - Target: {}", name, isTarget);
 
-				if (isTarget) ++stats.detection.targetsSpottedBy;
+				if (!stats.spottedBy.contains(name)) {
+					if (isTarget) {
+						stats.targetsSpottedBy.insert(name);
+					}
 
-				stats.spottedBy.insert(name);
-				stats.detection.nonTargetsSpottedBy = static_cast<int>(stats.spottedBy.size()) - stats.detection.targetsSpottedBy;
-				++stats.detection.spotted;
+					++stats.detection.spotted;
+					stats.spottedBy.insert(name);
+				}
+
+				stats.detection.nonTargetsSpottedBy = static_cast<int>(stats.spottedBy.size()) - stats.targetsSpottedBy.size();
 			}
 		}
 		else if (eventName == "Witnesses") {
@@ -1047,7 +1068,9 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 		}
 		else if (eventName == "DisguiseBlown") {
 			++stats.misc.disguisesBlown;
+			auto disguiseId = s_JsonEvent["Value"].get<std::string>();
 			stats.current.disguiseBlown = true;
+			stats.disguisesBlown.insert(disguiseId);
 		}
 		else if (eventName == "BrokenDisguiseCleared") {
 			stats.current.disguiseBlown = false;
@@ -1108,8 +1131,16 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 
 			if (isTarget) {
 				++stats.kills.targets;
-				if (stats.targetsSpottedBy.count(repoId))
+				
+				if (stats.targetsSpottedBy.contains(repoId))
 					++stats.detection.targetsSpottedByAndKilled;
+				else if (stats.spottedBy.contains(repoId)) {
+					stats.targetsSpottedBy.insert(repoId);
+					++stats.detection.targetsSpottedByAndKilled;
+				}
+
+				if (stats.targetBodyWitnesses.contains(repoId))
+					++stats.bodies.targetBodyWitnessesKilled;
 			}
 			else {
 				++stats.kills.nonTargets;
@@ -1249,6 +1280,8 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 				stats.tension.level += getTensionValue(tension) - getTensionValue(prevTension);
 			}
 		}
+		else if (eventName == "ChallengeCompleted") {}
+		else if (eventName == "HoldingIllegalWeapon") {}
 		else Logger::Info("Unhandled Event Sent: {} - {}", eventId, s_EventData);
 
 		this->UpdateDisplayStats();
