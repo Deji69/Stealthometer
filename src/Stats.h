@@ -194,7 +194,9 @@ struct MiscStats
 	int keyItemsPickedUp = 0;
 	int shotsFired = 0;
 	int missedShots = 0;
+	int objectsDestroyed = 0;
 	int setpiecesDestroyed = 0;
+	int shotsFired = 0;
 	int targetsMadeSick = 0;
 	int timesTrespassed = 0;
 };
