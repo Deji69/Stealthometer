@@ -157,7 +157,6 @@ struct DetectionStats
 	int targetsSpottedByAndKilled = 0;
 	int nonTargetsSpottedBy = 0;
 	int uniqueNPCsCaughtByAndKilled = 0;
-	int witnesses = 0;
 	int witnessesKilled = 0;
 	int situationsContained = 0;
 };
@@ -185,7 +184,6 @@ struct MiscStats
 	int camerasDestroyed = 0;
 	int closeCombatEngagements = 0;
 	int disguisesTaken = 0;
-	int disguisesBlown = 0;
 	int doorsUnlocked = 0;
 	int intelItemsPickedUp = 0;
 	int itemsPickedUp = 0;

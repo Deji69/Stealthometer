@@ -40,20 +40,20 @@ enum class RatingEventType
  */
 inline const auto playStyleRatings = std::array{
 	PlayStyleRating("Reckless", [](const Stats& stats) {
-		return stats.misc.disguisesBlown * 50
+		return static_cast<int>(stats.disguisesBlown.size()) * 50
 			+ stats.kills.nonTargets * 30
 			+ stats.kills.noticed * 30
 			+ stats.detection.spotted * 20
 			+ stats.detection.onCamera * 20;
 	}),
 	PlayStyleRating("Bad Actor", [](const Stats& stats) {
-		return stats.misc.disguisesBlown * 250;
+		return static_cast<int>(stats.disguisesBlown.size() * 250);
 	}),
 	PlayStyleRating("Chameleon", [](const Stats& stats) {
 		return stats.misc.disguisesTaken * 200;
 	}),
 	PlayStyleRating("Method Actor", [](const Stats& stats) {
-		if (stats.misc.disguisesBlown) return 0;
+		if (stats.disguisesBlown.size()) return 0;
 		return stats.misc.disguisesTaken * 250;
 	}),
 	PlayStyleRating("Boxer", [](const Stats& stats) {
@@ -149,7 +149,7 @@ inline const auto playStyleRatings = std::array{
 	}),
 	PlayStyleRating("Serial Killer", [](const Stats& stats) {
 		if (stats.kills.total < 3 || stats.kills.noticed > 0) return 0;
-		if (stats.detection.witnesses > stats.detection.witnessesKilled) return 0;
+		if (stats.witnesses.size()) return 0;
 		return stats.kills.total * 60;
 	}),
 	PlayStyleRating({"Mass Murderer", "Psychopath"}, [](const Stats& stats) {

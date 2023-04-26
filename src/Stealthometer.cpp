@@ -1073,7 +1073,9 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 			stats.disguisesBlown.insert(disguiseId);
 		}
 		else if (eventName == "BrokenDisguiseCleared") {
+			auto disguiseId = s_JsonEvent["Value"].get<std::string>();
 			stats.current.disguiseBlown = false;
+			stats.disguisesBlown.erase(disguiseId);
 		}
 		else if (eventName == "47_FoundTrespassing") {
 			++stats.detection.caughtTrespassing;
@@ -1121,10 +1123,9 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 			const auto killClass = value["KillClass"].get<std::string>();
 			const auto killMethodBroad = value["KillMethodBroad"].get<std::string>();
 			const auto killMethodStrict = value["KillMethodStrict"].get<std::string>();
-			const auto isWeaponSilenced = value["WeaponSilenced"].get<bool>();
-
 			const auto killItemCategoryIt = value.find("KillItemCategory");
 			const auto killItemCategory = killItemCategoryIt != value.end() ? killItemCategoryIt->get<std::string>() : "";
+			const auto isWeaponSilenced = value["WeaponSilenced"].get<bool>();
 
 			stats.bodies.allHidden = false;
 			++stats.kills.total;
