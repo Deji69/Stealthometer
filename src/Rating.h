@@ -130,7 +130,7 @@ inline const auto playStyleRatings = std::array{
 			}
 		}
 		if (!count) return 0;
-		return count * 50 + stats.misc.doorsUnlocked * 25;
+		return count * 50 + stats.misc.doorsUnlocked * 20;
 	}),
 	PlayStyleRating("Litterer", [](const Stats& stats) {
 		return static_cast<int>(stats.itemsDisposed.size() - stats.itemsObtained.size()) * 40;
