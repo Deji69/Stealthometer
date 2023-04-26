@@ -327,6 +327,10 @@ auto behaviourToString(ECompiledBehaviorType bt)
 auto Stealthometer::IsRepoIdTargetNPC(std::string id) -> bool
 {
 	std::transform(id.begin(), id.end(), id.begin(),[](auto c) { return std::toupper(c); });
+
+	if (this->freelanceTargets.contains(id))
+		return true;
+
 	for (auto const& actor : this->actorData) {
 		if (!actor.isTarget) continue;
 		if (id == actor.repoId) return true;
@@ -572,6 +576,7 @@ auto Stealthometer::NewContract() -> void
 	this->stats = Stats();
 	this->displayStats = DisplayStats();
 	this->npcCount = 0;
+	this->freelanceTargets.clear();
 	this->eventHistory.clear();
 	this->window.update();
 }
@@ -856,6 +861,13 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 			//s_JsonEvent["Value"]["Loadout"]
 			this->NewContract();
 		}
+		else if (eventName == "AddSyndicateTarget") {
+			auto id = s_JsonEvent["Value"].value("repoID", "");
+			if (!id.empty()) {
+				std::transform(id.begin(), id.end(), id.begin(), [](auto c) { return std::toupper(c); });
+				this->freelanceTargets.insert(id);
+			}
+		}
 		else if (eventName == "StartingSuit") {
 			auto entry = this->GetRepoEntry(s_JsonEvent["Value"]);
 			if (entry) {
@@ -1046,28 +1058,23 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 				auto name = nameJson.get<std::string>();
 				auto isTarget = this->IsRepoIdTargetNPC(name);
 
-				Logger::Debug("Spotted by {} - Target: {}", name, isTarget);
-
 				if (!stats.spottedBy.contains(name)) {
-					if (isTarget) {
-						stats.targetsSpottedBy.insert(name);
-					}
+					Logger::Info("Stealthometer: spotted by {} - Target: {}", name, isTarget);
+
+					if (isTarget) stats.targetsSpottedBy.insert(name);
 
 					++stats.detection.spotted;
 					stats.spottedBy.insert(name);
+					stats.detection.nonTargetsSpottedBy = static_cast<int>(stats.spottedBy.size()) - stats.targetsSpottedBy.size();
 				}
-
-				stats.detection.nonTargetsSpottedBy = static_cast<int>(stats.spottedBy.size()) - stats.targetsSpottedBy.size();
 			}
 		}
 		else if (eventName == "Witnesses") {
 			for (const auto& nameJson : s_JsonEvent["Value"]) {
 				stats.witnesses.insert(nameJson.get<std::string>());
-				++stats.detection.witnesses;
 			}
 		}
 		else if (eventName == "DisguiseBlown") {
-			++stats.misc.disguisesBlown;
 			auto disguiseId = s_JsonEvent["Value"].get<std::string>();
 			stats.current.disguiseBlown = true;
 			stats.disguisesBlown.insert(disguiseId);
@@ -1133,11 +1140,14 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 			if (isTarget) {
 				++stats.kills.targets;
 				
-				if (stats.targetsSpottedBy.contains(repoId))
+				if (stats.targetsSpottedBy.contains(repoId)) {
 					++stats.detection.targetsSpottedByAndKilled;
+					++stats.detection.uniqueNPCsCaughtByAndKilled;
+				}
 				else if (stats.spottedBy.contains(repoId)) {
 					stats.targetsSpottedBy.insert(repoId);
 					++stats.detection.targetsSpottedByAndKilled;
+					++stats.detection.uniqueNPCsCaughtByAndKilled;
 				}
 
 				if (stats.targetBodyWitnesses.contains(repoId))
@@ -1145,8 +1155,12 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 			}
 			else {
 				++stats.kills.nonTargets;
+
 				if (actorType == EActorType::eAT_Civilian) ++stats.kills.civilian;
 				if (actorType == EActorType::eAT_Guard) ++stats.kills.guard;
+
+				if (stats.spottedBy.count(repoId))
+					++stats.detection.uniqueNPCsCaughtByAndKilled;
 			}
 
 			if (value["IsHeadshot"].get<bool>()) {
@@ -1217,9 +1231,6 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 				++stats.killMethods.silencedWeapon;
 				if (isTarget) ++stats.killMethods.silencedWeaponTarget;
 			}
-
-			if (stats.spottedBy.count(repoId))
-				++stats.detection.uniqueNPCsCaughtByAndKilled;
 
 			auto witnessIt = stats.witnesses.find(repoId);
 			if (witnessIt != stats.witnesses.end()) {

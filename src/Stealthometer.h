@@ -1,6 +1,7 @@
 #pragma once
 #include <random>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <IPluginInterface.h>
 #include <Glacier/ZEntity.h>
@@ -58,6 +59,7 @@ private:
 	Stats stats;
 	DisplayStats displayStats;
 	StatWindow window;
+	std::unordered_set<std::string> freelanceTargets;
 	std::array<ActorData, 1000> actorData;
 	std::vector<std::string> eventHistory;
 	std::mt19937 randomGenerator;
