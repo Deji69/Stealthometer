@@ -701,7 +701,7 @@ auto Stealthometer::CalculateStealthRating() -> double
 	rating -= this->displayStats.bodiesFound * 5;
 	rating -= this->stats.detection.spotted * 5;
 	rating -= std::max(this->stats.pacifies.nonTargets - 3, 0) * 2;
-	rating += this->displayStats.bodiesHidden * 3;
+	rating += std::min(this->displayStats.bodiesHidden * 3, 15);
 	// TODO: more + adjustments
 	return std::min(std::max(rating, 0.0), 100.0);
 }
