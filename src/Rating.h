@@ -157,7 +157,7 @@ inline const auto playStyleRatings = std::array{
 		return stats.kills.nonTargets * 50;
 	}),
 	PlayStyleRating({"Bad Cook", "Envenomer", "Poisoner"}, [](const Stats& stats) {
-		return stats.misc.targetsMadeSick * 1000;
+		return stats.misc.targetsMadeSick * 750;
 	}),
 	PlayStyleRating("Sandman", [](const Stats& stats) {
 		return stats.pacifies.unnoticed * 100;
