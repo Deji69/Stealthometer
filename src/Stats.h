@@ -136,6 +136,13 @@ struct PacificationMethodStats
 
 struct BodyStats
 {
+	struct MurderedBodyFoundInfo
+	{
+		std::map<std::string, bool, InsensitiveCompareLexicographic> sightings;
+		bool isSightedByNonTarget = false;
+	};
+
+	std::unordered_map<std::string, MurderedBodyFoundInfo, StringHashLowercase, InsensitiveCompare> foundMurderedInfos;
 	bool allHidden = false;
 	bool allTargetsHidden = false;
 	int hidden = 0;

@@ -792,7 +792,7 @@ auto Stealthometer::UpdateDisplayStats() -> void
 	// Silent Assassin Status
 	auto sa = SilentAssassinStatus::OK;
 
-	if (this->stats.kills.nonTargets > 0 || this->stats.bodies.foundMurderedByNonTarget || this->stats.detection.nonTargetsSpottedBy > 0)
+	if (this->stats.kills.nonTargets > 0 || this->stats.bodies.foundMurderedByNonTarget > 0 || this->stats.detection.nonTargetsSpottedBy > 0)
 		sa = SilentAssassinStatus::Fail;
 
 	if (sa != SilentAssassinStatus::Fail) {
@@ -1011,19 +1011,42 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 		else if (eventName == "MurderedBodySeen") {
 			auto const& value = s_JsonEvent["Value"];
 			auto const& deadBody = value["DeadBody"];
-			auto const witnessId = value["Witness"].get<std::string>();
-			auto const isTarget = value.value("IsWitnessTarget", false);
+			auto const& witnessId = value["Witness"].get<std::string>();
+			auto const& deadBodyId = deadBody["RepositoryId"].get<std::string>();
+			auto const isWitnessTarget = value["IsWitnessTarget"].get<bool>();
+			auto const isBodyCrowd = deadBody["IsCrowdActor"].get<bool>();
+			auto const foundMurderedInfoIt = stats.bodies.foundMurderedInfos.find(deadBodyId);
+			auto const bodyAlreadyFound = foundMurderedInfoIt != stats.bodies.foundMurderedInfos.end();
+			auto const bodyAlreadyFoundByNonTarget = bodyAlreadyFound && foundMurderedInfoIt->second.isSightedByNonTarget;
+
+			if (bodyAlreadyFound) {
+				if (isWitnessTarget) stats.targetBodyWitnesses.emplace(witnessId);
+				else if (!bodyAlreadyFoundByNonTarget) {
+					foundMurderedInfoIt->second.isSightedByNonTarget = true;
+					++stats.bodies.foundMurderedByNonTarget;
+				}
+
+				foundMurderedInfoIt->second.sightings.try_emplace(witnessId, isWitnessTarget);
+			}
+			else {
 			++stats.bodies.foundMurdered;
-			if (deadBody["IsCrowdActor"].get<bool>())
-				++stats.bodies.foundCrowdMurders;
-			if (isTarget)
-				stats.targetBodyWitnesses.insert(witnessId);
-			else
-				++stats.bodies.foundMurderedByNonTarget;
+
+				if (isWitnessTarget) stats.targetBodyWitnesses.emplace(witnessId);
+				else ++stats.bodies.foundMurderedByNonTarget;
+				if (isBodyCrowd) ++stats.bodies.foundCrowdMurders;
+
+				BodyStats::MurderedBodyFoundInfo bodyFoundInfo;
+				bodyFoundInfo.sightings.emplace(witnessId, isWitnessTarget);
+				bodyFoundInfo.isSightedByNonTarget = !isWitnessTarget;
+				stats.bodies.foundMurderedInfos.try_emplace(deadBodyId, std::move(bodyFoundInfo));
+			}
 		}
 		else if (eventName == "BodyFound") {
+			auto const& deadBody = s_JsonEvent["Value"]["DeadBody"];
+			auto const& id = deadBody.value("RepositoryId", "");
+
 			++stats.bodies.found;
-			if (s_JsonEvent["Value"]["DeadBody"]["IsCrowdActor"].get<bool>())
+			if (deadBody["IsCrowdActor"].get<bool>())
 				++stats.bodies.foundCrowd;
 		}
 		else if (eventName == "Disguise") {
