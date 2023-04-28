@@ -9,6 +9,7 @@
 #include "json.hpp"
 #include "Stats.h"
 #include "StatWindow.h"
+#include "util.h"
 
 struct ActorData
 {
@@ -42,7 +43,7 @@ public:
 private:
 	auto DrawSettingsUI(bool focused) -> void;
 	auto DrawExpandedStatsUI(bool focused) -> void;
-	auto IsRepoIdTargetNPC(std::string id) -> bool;
+	auto IsRepoIdTargetNPC(const std::string& id) -> bool;
 	auto GetRepoEntry(const std::string& id) -> const nlohmann::json*;
 	auto CreateItemInfo(const std::string& repoId) -> ItemInfo;
 	auto AddObtainedItem(const std::string& id, ItemInfo item) -> void;
@@ -59,11 +60,11 @@ private:
 	Stats stats;
 	DisplayStats displayStats;
 	StatWindow window;
-	std::unordered_set<std::string> freelanceTargets;
+	std::unordered_set<std::string, StringHashLowercase> freelanceTargets;
 	std::array<ActorData, 1000> actorData;
 	std::vector<std::string> eventHistory;
 	std::mt19937 randomGenerator;
-	std::unordered_map<std::string, nlohmann::json> repo;
+	std::unordered_map<std::string, nlohmann::json, StringHashLowercase> repo;
 	int npcCount = 0;
 	bool statVisibleUI = false;
 	bool externalWindowEnabled = true;

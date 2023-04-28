@@ -2,8 +2,10 @@
 #include <map>
 #include <set>
 #include <string>
+#include <unordered_set>
 #include <Glacier/Enums.h>
 #include "PlayStyleRating.h"
+#include "util.h"
 
 enum class SilentAssassinStatus
 {
@@ -209,13 +211,13 @@ struct CurrentStats
 
 struct Stats
 {
-	std::set<std::string> witnesses;
-	std::set<std::string> spottedBy;
-	std::set<std::string> targetsSpottedBy;
-	std::set<std::string> targetBodyWitnesses;
-	std::set<std::string> disguisesBlown;
-	std::map<std::string, ItemInfo> itemsObtained;
-	std::map<std::string, ItemInfo> itemsDisposed;
+	std::set<std::string, InsensitiveCompare> witnesses;
+	std::set<std::string, InsensitiveCompare> spottedBy;
+	std::set<std::string, InsensitiveCompare> targetsSpottedBy;
+	std::set<std::string, InsensitiveCompare> targetBodyWitnesses;
+	std::set<std::string, InsensitiveCompare> disguisesBlown;
+	std::map<std::string, ItemInfo, InsensitiveCompare> itemsObtained;
+	std::map<std::string, ItemInfo, InsensitiveCompare> itemsDisposed;
 	KillStats kills;
 	KillMethodStats killMethods;
 	PacificationStats pacifies;

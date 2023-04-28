@@ -324,10 +324,8 @@ auto behaviourToString(ECompiledBehaviorType bt)
 	}
 }
 
-auto Stealthometer::IsRepoIdTargetNPC(std::string id) -> bool
+auto Stealthometer::IsRepoIdTargetNPC(const std::string& id) -> bool
 {
-	std::transform(id.begin(), id.end(), id.begin(),[](auto c) { return std::toupper(c); });
-
 	if (this->freelanceTargets.contains(id))
 		return true;
 
@@ -863,9 +861,7 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 		}
 		else if (eventName == "AddSyndicateTarget") {
 			auto id = s_JsonEvent["Value"].value("repoID", "");
-			if (!id.empty()) {
-				std::transform(id.begin(), id.end(), id.begin(), [](auto c) { return std::toupper(c); });
-				this->freelanceTargets.insert(id);
+			if (!id.empty()) this->freelanceTargets.emplace(std::move(id));
 			}
 		}
 		else if (eventName == "StartingSuit") {
