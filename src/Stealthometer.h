@@ -60,11 +60,11 @@ private:
 	Stats stats;
 	DisplayStats displayStats;
 	StatWindow window;
-	std::unordered_set<std::string, StringHashLowercase> freelanceTargets;
+	std::unordered_set<std::string, StringHashLowercase, InsensitiveCompare> freelanceTargets;
 	std::array<ActorData, 1000> actorData;
 	std::vector<std::string> eventHistory;
 	std::mt19937 randomGenerator;
-	std::unordered_map<std::string, nlohmann::json, StringHashLowercase> repo;
+	std::unordered_map<std::string, nlohmann::json, StringHashLowercase, InsensitiveCompare> repo;
 	int npcCount = 0;
 	float cutsceneEndTime = 0;
 	bool statVisibleUI = false;

@@ -331,7 +331,7 @@ auto Stealthometer::IsRepoIdTargetNPC(const std::string& id) -> bool
 
 	for (auto const& actor : this->actorData) {
 		if (!actor.isTarget) continue;
-		if (id == actor.repoId) return true;
+		if (InsensitiveCompare{}(id, actor.repoId)) return true;
 	}
 	return false;
 }

@@ -211,13 +211,13 @@ struct CurrentStats
 
 struct Stats
 {
-	std::set<std::string, InsensitiveCompare> witnesses;
-	std::set<std::string, InsensitiveCompare> spottedBy;
-	std::set<std::string, InsensitiveCompare> targetsSpottedBy;
-	std::set<std::string, InsensitiveCompare> targetBodyWitnesses;
-	std::set<std::string, InsensitiveCompare> disguisesBlown;
-	std::map<std::string, ItemInfo, InsensitiveCompare> itemsObtained;
-	std::map<std::string, ItemInfo, InsensitiveCompare> itemsDisposed;
+	std::set<std::string, InsensitiveCompareLexicographic> witnesses;
+	std::set<std::string, InsensitiveCompareLexicographic> spottedBy;
+	std::set<std::string, InsensitiveCompareLexicographic> targetsSpottedBy;
+	std::set<std::string, InsensitiveCompareLexicographic> targetBodyWitnesses;
+	std::set<std::string, InsensitiveCompareLexicographic> disguisesBlown;
+	std::map<std::string, ItemInfo, InsensitiveCompareLexicographic> itemsObtained;
+	std::map<std::string, ItemInfo, InsensitiveCompareLexicographic> itemsDisposed;
 	KillStats kills;
 	KillMethodStats killMethods;
 	PacificationStats pacifies;
