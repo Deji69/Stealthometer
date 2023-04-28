@@ -574,6 +574,7 @@ auto Stealthometer::NewContract() -> void
 	this->stats = Stats();
 	this->displayStats = DisplayStats();
 	this->npcCount = 0;
+	this->cutsceneEndTime = 0;
 	this->freelanceTargets.clear();
 	this->eventHistory.clear();
 	this->window.update();
@@ -859,11 +860,13 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 			//s_JsonEvent["Value"]["Loadout"]
 			this->NewContract();
 		}
+		else if (eventName == "IntroCutEnd") {
+			this->cutsceneEndTime = s_JsonEvent["Timestamp"].get<float>();
+		}
 		else if (eventName == "AddSyndicateTarget") {
 			auto id = s_JsonEvent["Value"].value("repoID", "");
 			if (!id.empty()) this->freelanceTargets.emplace(std::move(id));
 			}
-		}
 		else if (eventName == "StartingSuit") {
 			auto entry = this->GetRepoEntry(s_JsonEvent["Value"]);
 			if (entry) {
@@ -932,8 +935,10 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 		}
 		else if (eventName == "ItemPickedUp") {
 			// TODO: bit of a hacky workaround to fix Freelancer loadout items counting as picked up
-			// ignore any items picked up in the first 3 seconds
+			// ignore any items picked up in the first 3 seconds (+ subtract for cutscene length)
 			auto time = s_JsonEvent["Timestamp"].get<float>();
+			time -= this->cutsceneEndTime;
+
 			if (time > 3.0) {
 				auto id = s_JsonEvent["Value"]["RepositoryId"].get<std::string>();
 				auto it = stats.itemsObtained.find(id);

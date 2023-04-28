@@ -66,6 +66,7 @@ private:
 	std::mt19937 randomGenerator;
 	std::unordered_map<std::string, nlohmann::json, StringHashLowercase> repo;
 	int npcCount = 0;
+	float cutsceneEndTime = 0;
 	bool statVisibleUI = false;
 	bool externalWindowEnabled = true;
 	bool externalWindowDarkMode = true;
