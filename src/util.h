@@ -15,7 +15,7 @@ struct InsensitiveCompare
 struct InsensitiveCompareLexicographic
 {
 	auto operator()(std::string_view a, std::string_view b) const -> bool {
-		return std::equal(a.begin(), a.end(), b.begin(), b.end(), [](unsigned char a, unsigned char b) {
+		return std::lexicographical_compare(a.begin(), a.end(), b.begin(), b.end(), [](unsigned char a, unsigned char b) {
 			return std::tolower(a) < std::tolower(b);
 		});
 	}

@@ -866,7 +866,7 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 		else if (eventName == "AddSyndicateTarget") {
 			auto id = s_JsonEvent["Value"].value("repoID", "");
 			if (!id.empty()) this->freelanceTargets.emplace(std::move(id));
-			}
+		}
 		else if (eventName == "StartingSuit") {
 			auto entry = this->GetRepoEntry(s_JsonEvent["Value"]);
 			if (entry) {
@@ -1029,7 +1029,7 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 				foundMurderedInfoIt->second.sightings.try_emplace(witnessId, isWitnessTarget);
 			}
 			else {
-			++stats.bodies.foundMurdered;
+				++stats.bodies.foundMurdered;
 
 				if (isWitnessTarget) stats.targetBodyWitnesses.emplace(witnessId);
 				else ++stats.bodies.foundMurderedByNonTarget;
