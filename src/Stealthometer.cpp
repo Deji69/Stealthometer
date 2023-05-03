@@ -1,4 +1,5 @@
 #include <Windows.h>
+#include <functional>
 #include <ranges>
 #include <thread>
 #include <Hooks.h>
@@ -58,7 +59,7 @@ auto Stealthometer::Init() -> void
 
 	auto const fs = cmrc::stealthometer::get_filesystem();
 
-	if (!fs.is_file("data/repo.json")) Logger::Error("Stealthometer: repo.json not found in embedde filesystem.");
+	if (!fs.is_file("data/repo.json")) Logger::Error("Stealthometer: repo.json not found in embedded filesystem.");
 	else {
 		auto file = fs.open("data/repo.json");
 		auto repo = nlohmann::json::parse(file.begin(), file.end());
@@ -324,7 +325,7 @@ auto behaviourToString(ECompiledBehaviorType bt)
 	}
 }
 
-auto Stealthometer::IsRepoIdTargetNPC(const std::string& id) -> bool
+auto Stealthometer::IsRepoIdTargetNPC(const std::string& id) const -> bool
 {
 	if (this->freelanceTargets.contains(id))
 		return true;
@@ -691,6 +692,54 @@ auto getTensionValue(EGameTension tension) -> int
 	return 0;
 }
 
+auto Stealthometer::GetSilentAssassinStatus() const -> SilentAssassinStatus
+{
+	// Non-Target Kills
+	auto nonTargetKills = this->stats.kills.nonTargets.size() + this->stats.kills.crowd;
+	if (nonTargetKills > 0) return SilentAssassinStatus::Fail;
+
+	// Spotted
+	auto isKilled = [this](const std::string& id) {
+		return this->stats.kills.targets.contains(id)
+			|| this->stats.kills.nonTargets.contains(id);
+	};
+	auto isTarget = [this](const std::string& id) {
+		return this->IsRepoIdTargetNPC(id);
+	};
+	auto witnessesNotKilled = this->stats.witnesses | std::views::filter(std::not_fn(isKilled));
+	auto spottedByNotKilled = this->stats.spottedBy | std::views::filter(std::not_fn(isKilled));
+	auto witnessesNonTarget = witnessesNotKilled | std::views::filter(std::not_fn(isTarget));
+	auto spottedByNonTarget = spottedByNotKilled | std::views::filter(std::not_fn(isTarget));
+	auto numWitnesses = std::distance(witnessesNotKilled.begin(), witnessesNotKilled.end());
+	auto numSpottedBy = std::distance(spottedByNotKilled.begin(), spottedByNotKilled.end());
+	auto numWitnessesNT = std::distance(witnessesNotKilled.begin(), witnessesNotKilled.end());
+	auto numSpottedByNT = std::distance(spottedByNotKilled.begin(), spottedByNotKilled.end());
+
+	if (numWitnessesNT > 0 || numSpottedByNT > 0)
+		return SilentAssassinStatus::Fail;
+
+	// Noticed Kills
+	if (stats.kills.noticed > 0)
+		return SilentAssassinStatus::Fail;
+
+	// Bodies Found
+	if (this->stats.bodies.foundMurderedByNonTarget > 0)
+		return SilentAssassinStatus::Fail;
+
+	auto spottedByTarget = this->stats.targetBodyWitnesses.size() > this->stats.bodies.targetBodyWitnessesKilled
+		|| this->stats.targetsSpottedBy.size() > this->stats.detection.targetsSpottedByAndKilled;
+
+	// Evidence
+	if (this->stats.detection.onCamera) {
+		if (spottedByTarget)
+			return SilentAssassinStatus::RedeemableCameraAndTarget;
+
+		return SilentAssassinStatus::RedeemableCamera;
+	}
+
+	return spottedByTarget ? SilentAssassinStatus::RedeemableTarget : SilentAssassinStatus::OK;
+}
+
 auto Stealthometer::CalculateStealthRating() -> double
 {
 	auto rating = 100.0;
@@ -790,21 +839,7 @@ auto Stealthometer::UpdateDisplayStats() -> void
 	}
 
 	// Silent Assassin Status
-	auto sa = SilentAssassinStatus::OK;
-
-	if (this->stats.kills.nonTargets > 0 || this->stats.bodies.foundMurderedByNonTarget > 0 || this->stats.detection.nonTargetsSpottedBy > 0)
-		sa = SilentAssassinStatus::Fail;
-
-	if (sa != SilentAssassinStatus::Fail) {
-		if (this->stats.targetBodyWitnesses.size() > this->stats.bodies.targetBodyWitnessesKilled
-			|| this->stats.targetsSpottedBy.size() > this->stats.detection.targetsSpottedByAndKilled)
-			sa = SilentAssassinStatus::RedeemableTarget;
-	}
-
-	if (this->stats.detection.onCamera) {
-		if (sa == SilentAssassinStatus::OK) sa = SilentAssassinStatus::RedeemableCamera;
-		else if (sa == SilentAssassinStatus::RedeemableTarget) sa = SilentAssassinStatus::RedeemableCameraAndTarget;
-	}
+	auto sa = this->GetSilentAssassinStatus();
 
 	if (this->displayStats.silentAssassin != sa) {
 		this->displayStats.silentAssassin = sa;
@@ -875,6 +910,7 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 				this->stats.current.inSuit = isSuit;
 			}
 		}
+		//eventName == "TargetEscapeFoiled" // Yuki killed in Gondola
 		//eventName == "ItemDestroyed"
 		else if (eventName == "setpieces") {
 			// Reporter camera destroyed
@@ -1003,6 +1039,14 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 			++stats.misc.agilityActions;
 		}
 		else if (eventName == "AccidentBodyFound") {
+			auto const& value = s_JsonEvent["Value"];
+			auto const& deadBody = value["DeadBody"];
+			auto const deadBodyId = deadBody["RepositoryId"].get<std::string>();
+
+			if (this->IsRepoIdTargetNPC(deadBodyId))
+				++stats.bodies.targetsFound;
+
+			++stats.bodies.found;
 			++stats.bodies.foundAccidents;
 		}
 		else if (eventName == "DeadBodySeen") {
@@ -1011,15 +1055,16 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 		else if (eventName == "MurderedBodySeen") {
 			auto const& value = s_JsonEvent["Value"];
 			auto const& deadBody = value["DeadBody"];
-			auto const& witnessId = value["Witness"].get<std::string>();
-			auto const& deadBodyId = deadBody["RepositoryId"].get<std::string>();
+			auto const witnessId = value["Witness"].get<std::string>();
+			auto const deadBodyId = deadBody["RepositoryId"].get<std::string>();
 			auto const isWitnessTarget = value["IsWitnessTarget"].get<bool>();
 			auto const isBodyCrowd = deadBody["IsCrowdActor"].get<bool>();
 			auto const foundMurderedInfoIt = stats.bodies.foundMurderedInfos.find(deadBodyId);
 			auto const bodyAlreadyFound = foundMurderedInfoIt != stats.bodies.foundMurderedInfos.end();
 			auto const bodyAlreadyFoundByNonTarget = bodyAlreadyFound && foundMurderedInfoIt->second.isSightedByNonTarget;
 
-			if (bodyAlreadyFound) {
+			if (isBodyCrowd) { }
+			else if (bodyAlreadyFound) {
 				if (isWitnessTarget) stats.targetBodyWitnesses.emplace(witnessId);
 				else if (!bodyAlreadyFoundByNonTarget) {
 					foundMurderedInfoIt->second.isSightedByNonTarget = true;
@@ -1029,6 +1074,10 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 				foundMurderedInfoIt->second.sightings.try_emplace(witnessId, isWitnessTarget);
 			}
 			else {
+				if (this->IsRepoIdTargetNPC(deadBodyId))
+					++stats.bodies.targetsFound;
+
+				++stats.bodies.found;
 				++stats.bodies.foundMurdered;
 
 				if (isWitnessTarget) stats.targetBodyWitnesses.emplace(witnessId);
@@ -1045,7 +1094,7 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 			auto const& deadBody = s_JsonEvent["Value"]["DeadBody"];
 			auto const& id = deadBody.value("RepositoryId", "");
 
-			++stats.bodies.found;
+			//++stats.bodies.found;
 			if (deadBody["IsCrowdActor"].get<bool>())
 				++stats.bodies.foundCrowd;
 		}
@@ -1142,7 +1191,7 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 		}
 		else if (eventName == "CrowdNPC_Died") {
 			++stats.kills.total;
-			++stats.kills.nonTargets;
+			++stats.kills.crowd;
 			++stats.kills.civilian;
 		}
 		else if (eventName == "Kill") {
@@ -1162,29 +1211,31 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 			++stats.kills.total;
 
 			if (isTarget) {
-				++stats.kills.targets;
-				
-				if (stats.targetsSpottedBy.contains(repoId)) {
-					++stats.detection.targetsSpottedByAndKilled;
-					++stats.detection.uniqueNPCsCaughtByAndKilled;
-				}
-				else if (stats.spottedBy.contains(repoId)) {
-					stats.targetsSpottedBy.insert(repoId);
-					++stats.detection.targetsSpottedByAndKilled;
-					++stats.detection.uniqueNPCsCaughtByAndKilled;
-				}
+				auto res = stats.kills.targets.emplace(repoId);
+				if (res.second) {
+					if (stats.targetsSpottedBy.contains(repoId)) {
+						++stats.detection.targetsSpottedByAndKilled;
+						++stats.detection.uniqueNPCsCaughtByAndKilled;
+					}
+					else if (stats.spottedBy.contains(repoId)) {
+						stats.targetsSpottedBy.insert(repoId);
+						++stats.detection.targetsSpottedByAndKilled;
+						++stats.detection.uniqueNPCsCaughtByAndKilled;
+					}
 
-				if (stats.targetBodyWitnesses.contains(repoId))
-					++stats.bodies.targetBodyWitnessesKilled;
+					if (stats.targetBodyWitnesses.contains(repoId))
+						++stats.bodies.targetBodyWitnessesKilled;
+				}
 			}
 			else {
-				++stats.kills.nonTargets;
+				auto res = stats.kills.nonTargets.emplace(repoId);
+				if (res.second) {
+					if (actorType == EActorType::eAT_Civilian) ++stats.kills.civilian;
+					if (actorType == EActorType::eAT_Guard) ++stats.kills.guard;
 
-				if (actorType == EActorType::eAT_Civilian) ++stats.kills.civilian;
-				if (actorType == EActorType::eAT_Guard) ++stats.kills.guard;
-
-				if (stats.spottedBy.count(repoId))
-					++stats.detection.uniqueNPCsCaughtByAndKilled;
+					if (stats.spottedBy.count(repoId))
+						++stats.detection.uniqueNPCsCaughtByAndKilled;
+				}
 			}
 
 			if (value["IsHeadshot"].get<bool>()) {
@@ -1263,6 +1314,7 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 			}
 		}
 		else if (eventName == "NoticedKill") {
+			Logger::Info("NoticedKill {}", s_EventData);
 			++stats.kills.noticed;
 		}
 		else if (eventName == "Noticed_Pacified") {

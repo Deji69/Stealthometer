@@ -39,11 +39,12 @@ public:
 	auto NewContract() -> void;
 	auto UpdateDisplayStats() -> void;
 	auto CalculateStealthRating() -> double;
+	auto GetSilentAssassinStatus() const -> SilentAssassinStatus;
 
 private:
 	auto DrawSettingsUI(bool focused) -> void;
 	auto DrawExpandedStatsUI(bool focused) -> void;
-	auto IsRepoIdTargetNPC(const std::string& id) -> bool;
+	auto IsRepoIdTargetNPC(const std::string& id) const -> bool;
 	auto GetRepoEntry(const std::string& id) -> const nlohmann::json*;
 	auto CreateItemInfo(const std::string& repoId) -> ItemInfo;
 	auto AddObtainedItem(const std::string& id, ItemInfo item) -> void;

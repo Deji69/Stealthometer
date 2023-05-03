@@ -104,15 +104,16 @@ struct KillMethodStats
 
 struct KillStats
 {
+	std::set<std::string> targets;
+	std::set<std::string> nonTargets;
 	int total = 0;
-	int targets = 0;
-	int nonTargets = 0;
 	int noticed = 0;
 	int unnoticed = 0;
 	int unnoticedTarget = 0;
 	int unnoticedNonTarget = 0;
 	int guard = 0;
 	int civilian = 0;
+	int crowd = 0;
 };
 
 struct PacificationStats

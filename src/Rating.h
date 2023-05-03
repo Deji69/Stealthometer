@@ -41,7 +41,7 @@ enum class RatingEventType
 inline const auto playStyleRatings = std::array{
 	PlayStyleRating("Reckless", [](const Stats& stats) {
 		return static_cast<int>(stats.disguisesBlown.size()) * 50
-			+ stats.kills.nonTargets * 30
+			+ static_cast<int>(stats.kills.nonTargets.size()) * 30
 			+ stats.kills.noticed * 30
 			+ stats.detection.spotted * 20
 			+ stats.detection.onCamera * 20;
@@ -72,8 +72,8 @@ inline const auto playStyleRatings = std::array{
 		return stats.detection.spotted * 100;
 	}),
 	PlayStyleRating("Terrorist", [](const Stats& stats) {
-		if (stats.kills.nonTargets < 5) return 0;
-		return stats.tension.level * 6 + stats.kills.nonTargets * 5;;
+		if (stats.kills.nonTargets.size() < 5) return 0;
+		return stats.tension.level * 6 + static_cast<int>(stats.kills.nonTargets.size() * 5);
 	}),
 	PlayStyleRating("Hacker", [](const Stats& stats) {
 		return stats.misc.recorderErased * 300;
@@ -145,7 +145,7 @@ inline const auto playStyleRatings = std::array{
 	}),
 	PlayStyleRating("Murderer", [](const Stats& stats) {
 		if (stats.kills.total >= 47) return 0;
-		return stats.kills.nonTargets * 50;
+		return static_cast<int>(stats.kills.nonTargets.size() * 50);
 	}),
 	PlayStyleRating("Serial Killer", [](const Stats& stats) {
 		if (stats.kills.total < 3 || stats.kills.noticed > 0) return 0;
@@ -154,7 +154,7 @@ inline const auto playStyleRatings = std::array{
 	}),
 	PlayStyleRating({"Mass Murderer", "Psychopath"}, [](const Stats& stats) {
 		if (stats.kills.total < 47) return 0;
-		return stats.kills.nonTargets * 50;
+		return static_cast<int>(stats.kills.nonTargets.size() * 50);
 	}),
 	PlayStyleRating({"Bad Cook", "Envenomer", "Poisoner"}, [](const Stats& stats) {
 		return stats.misc.targetsMadeSick * 750;
