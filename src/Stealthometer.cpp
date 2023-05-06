@@ -921,6 +921,9 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 		//eventName == "ItemDestroyed" // broken camcorder
 		//eventName == "TargetEscapeFoiled" // Yuki killed in Gondola
 		else if (eventName == "setpieces") {
+			// Photo taken
+			// {"Timestamp":14.068766,"Name":"setpieces","ContractSessionId":"2517189686363575049-c894c9d2-b984-4c5b-ad0a-2be27e3b04f5","ContractId":"d2419fe4-ea72-4e61-b91b-bb39706f551d","Value":{"RepositoryId":"6c3fa06e-7478-4484-81e6-f08dba1722eb","name_metricvalue":"NotAvailable","setpieceHelper_metricvalue":"Camera","setpieceType_metricvalue":"picturetaken","toolUsed_metricvalue":"NA","Item_triggered_metricvalue":"NA","Position":"ZDynamicObject::ToString() unknown type: SVector3"},"UserId":"b1585b4d-36f0-48a0-8ffa-1b72f01759da","SessionId":"61e82efa0bcb4a3088825dd75e115f61-2846824114","Origin":"gameclient","Id":"971f62e0-e3d9-4ad3-8c16-bfc7fd2fa8a8"}
+
 			// Reporter camera destroyed
 			// {"Timestamp":405.325409,"Name":"ItemDestroyed","ContractSessionId":"64e8780e-00bb-45d1-a270-ff1df03082de","ContractId":"00000000-0000-0000-0000-000000000200","Value":{"ItemName":"ActItem_Camera"},"UserId":"00000000-0000-0000-0000-000000000000","SessionId":"","Origin":"gameclient","Id":"9ce9fbf2-e001-42cc-a715-9bae8423285d"}
 
