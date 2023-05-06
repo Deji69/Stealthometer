@@ -26,6 +26,7 @@ struct DisplayStats
 {
 	int guardKills = 0;
 	int civilianKills = 0;
+	int noticedKills = 0;
 	int tension = 0;
 	int pacifications = 0;
 	int spotted = 0;

@@ -608,8 +608,10 @@ auto Stealthometer::CreateItemInfo(const std::string& id) -> ItemInfo
 				itemInfoType = ItemInfoType::Coin;
 			else if (itemType == "eItemAmmo")
 				itemInfoType = ItemInfoType::AmmoBox;
-			else if (inventoryCategoryIcon == "QuestItem" || inventoryCategoryIcon == "questitem")
+			else if (inventoryCategoryIcon == "QuestItem" || inventoryCategoryIcon == "questitem") {
+				itemInfoType = ItemInfoType::Intel;
 				++stats.misc.intelItemsPickedUp;
+			}
 			else if (inventoryCategoryIcon == "poison")
 				itemInfoType = ItemInfoType::Poison;
 			else if (inventoryCategoryIcon == "melee") {
@@ -838,6 +840,12 @@ auto Stealthometer::UpdateDisplayStats() -> void
 		updated = true;
 	}
 
+	// Noticed Kills
+	if (this->displayStats.noticedKills != this->stats.kills.noticed) {
+		this->displayStats.noticedKills = this->stats.kills.noticed;
+		updated = true;
+	}
+
 	// Silent Assassin Status
 	auto sa = this->GetSilentAssassinStatus();
 
@@ -910,8 +918,8 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 				this->stats.current.inSuit = isSuit;
 			}
 		}
+		//eventName == "ItemDestroyed" // broken camcorder
 		//eventName == "TargetEscapeFoiled" // Yuki killed in Gondola
-		//eventName == "ItemDestroyed"
 		else if (eventName == "setpieces") {
 			// Reporter camera destroyed
 			// {"Timestamp":405.325409,"Name":"ItemDestroyed","ContractSessionId":"64e8780e-00bb-45d1-a270-ff1df03082de","ContractId":"00000000-0000-0000-0000-000000000200","Value":{"ItemName":"ActItem_Camera"},"UserId":"00000000-0000-0000-0000-000000000000","SessionId":"","Origin":"gameclient","Id":"9ce9fbf2-e001-42cc-a715-9bae8423285d"}
@@ -1049,6 +1057,11 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 			++stats.bodies.found;
 			++stats.bodies.foundAccidents;
 		}
+		// TODO: The game can send 0'd repository IDs for dead bodies in certain situations.
+		// This makes it difficult to uniquely identify bodies to keep count of bodies found.
+		// IsCrowdActor is also usually true when this happens. Seemingly the game always
+		// eventually sends other body found events with correct IDs. Need a good solution
+		// to link these events to reliably obtain the necessary information.
 		else if (eventName == "DeadBodySeen") {
 			++stats.bodies.deadSeen;
 		}

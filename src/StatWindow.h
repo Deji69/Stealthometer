@@ -24,6 +24,7 @@ class StatWindow
 		BodiesHidden,
 		DisguisesBlown,
 		TargetsFound,
+		NoticedKills,
 		PlayStyle,
 		StealthRating,
 		SilentAssassin,

@@ -411,7 +411,8 @@ auto StatWindow::paint(HWND wnd) -> void
 	this->paintCell(hdc, "Witnesses", Stat::Witnesses, 1, 2);
 	this->paintCell(hdc, "Bodies Hidden", Stat::BodiesHidden, 1, 3);
 	this->paintCell(hdc, "Disguises Taken", Stat::DisguisesTaken, 1, 4);
-	this->paintCell(hdc, "Targets Found", Stat::TargetsFound, 1, 5);
+	//this->paintCell(hdc, "Targets Found", Stat::TargetsFound, 1, 5);
+	this->paintCell(hdc, "Noticed Kills", Stat::NoticedKills, 1, 5);
 
 	this->paintCell(hdc, "Traceless", Stat::PlayStyle, 0, 6);
 	this->paintCell(hdc, "Stealth", Stat::StealthRating, 1, 6);
@@ -461,6 +462,8 @@ auto StatWindow::formatStat(Stat stat) -> std::string
 			return std::format("{:d}", this->stats.disguisesTaken);
 		case Stat::TargetsFound:
 			return this->stats.targetsFound ? "Yes"s : "No"s;
+		case Stat::NoticedKills:
+			return std::format("{:d}", this->stats.noticedKills);
 		case Stat::Recorded:
 			return this->stats.recorded ? "Yes"s : "No"s;
 		case Stat::StealthRating: {
