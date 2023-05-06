@@ -688,8 +688,8 @@ auto getTensionValue(EGameTension tension) -> int
 		case EGameTension::EGT_Searching: return 1;
 		case EGameTension::EGT_AlertedHigh: return 3;
 		case EGameTension::EGT_Hunting: return 5;
-		case EGameTension::EGT_Arrest: return 10;
-		case EGameTension::EGT_Combat: return 15;
+		case EGameTension::EGT_Arrest: return 8;
+		case EGameTension::EGT_Combat: return 10;
 	}
 	return 0;
 }
