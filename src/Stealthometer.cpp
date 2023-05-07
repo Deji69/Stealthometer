@@ -668,9 +668,15 @@ auto Stealthometer::SetupEvents() -> void {
 		++stats.misc.itemsRemovedFromInventory;
 		this->RemoveObtainedItem(ev.Value.RepositoryId);
 	});
+	events.listen<Events::FirstNonHeadshot>([this](const ServerEvent<Events::FirstNonHeadshot>& ev) {
+		// TODO: ?
+	});
+	events.listen<Events::FirstMissedShot>([this](const ServerEvent<Events::FirstMissedShot>& ev) {
+		// TODO: ?
+	});
 	events.listen<Events::Actorsick>([this](const ServerEvent<Events::Actorsick>& ev) {
 		if (ev.Value.IsTarget) ++stats.misc.targetsMadeSick;
-		Logger::Debug("ActorSick: {}", nlohmann::json({{
+		Logger::Debug("{} ActorSick: {}", ev.Timestamp, nlohmann::json{
 			{"ActorId", ev.Value.ActorId},
 			{"ActorName", ev.Value.ActorName},
 			{"ActorType", ev.Value.ActorType},
@@ -678,7 +684,7 @@ auto Stealthometer::SetupEvents() -> void {
 			{"actor_R_ID", ev.Value.actor_R_ID},
 			{"item_R_ID", ev.Value.item_R_ID},
 			{"setpiece_R_ID", ev.Value.setpiece_R_ID},
-		}}));
+		}.dump());
 	});
 	events.listen<Events::Trespassing>([this](const ServerEvent<Events::Trespassing>& ev) {
 		stats.current.trespassing = ev.Value.IsTrespassing;
@@ -1093,14 +1099,14 @@ auto Stealthometer::SetupEvents() -> void {
 		// {"Timestamp":10.607255,"Name":"setpieces","ContractSessionId":"2517213274420850852-356e1881-82f8-4c5a-b7f1-63ab8432c042","ContractId":"00000000-0000-0000-0000-000000000200","Value":{"RepositoryId":"683a099f-5d1b-4800-a781-5d9dfe13b12c","name_metricvalue":"NotAvailable","setpieceHelper_metricvalue":"Activator_NoTool","setpieceType_metricvalue":"DefaultActivators","toolUsed_metricvalue":"NA","Item_triggered_metricvalue":"NotAvailable","Position":"ZDynamicObject::ToString() unknown type: SVector3"},"UserId":"b1585b4d-36f0-48a0-8ffa-1b72f01759da","SessionId":"61e82efa0bcb4a3088825dd75e115f61-2714020697","Origin":"gameclient","Id":"af42da25-9c48-44d1-bd46-3bb88cd91c88"}
 		// {"Timestamp":10.864028,"Name":"setpieces","ContractSessionId":"2517213274420850852-356e1881-82f8-4c5a-b7f1-63ab8432c042","ContractId":"00000000-0000-0000-0000-000000000200","Value":{"RepositoryId":"2d7a91b9-1b3a-4db3-a8bf-6249db70c339","name_metricvalue":"NotAvailable","setpieceHelper_metricvalue":"SuspendedObject","setpieceType_metricvalue":"trap","toolUsed_metricvalue":"NA","Item_triggered_metricvalue":"NA","Position":"ZDynamicObject::ToString() unknown type: SVector3"},"UserId":"b1585b4d-36f0-48a0-8ffa-1b72f01759da","SessionId":"61e82efa0bcb4a3088825dd75e115f61-2714020697","Origin":"gameclient","Id":"ad4e6c9d-4438-4fc1-bd6d-9697fe6ad6f0"}
 		// {"Timestamp":11.463453,"Name":"Investigate_Curious","ContractSessionId":"2517213274420850852-356e1881-82f8-4c5a-b7f1-63ab8432c042","ContractId":"00000000-0000-0000-0000-000000000200","Value":{"ActorId":2655118168.000000,"RepositoryId":"f9c3905a-ec94-43b6-aae6-8b2f752467f7","SituationType":"AIS_INVESTIGATE_CURIOUS","EventType":"AISE_ActorJoined","JoinReason":"AISJR_Default","InvestigationType":9.000000},"UserId":"b1585b4d-36f0-48a0-8ffa-1b72f01759da","SessionId":"61e82efa0bcb4a3088825dd75e115f61-2714020697","Origin":"gameclient","Id":"8ad219e4-5222-4f7b-bdc8-b6224db5aa6d"}
-		Logger::Info("Setpieces: {}", nlohmann::json({{
+		Logger::Info("Setpieces: {}", nlohmann::json{
 			{"name_metricvalue", ev.Value.name_metricvalue},
 			{"setpieceHelper_metricvalue", ev.Value.setpieceHelper_metricvalue},
 			{"setpieceType_metricvalue", ev.Value.setpieceType_metricvalue},
 			{"setpieceType_metricvalue", ev.Value.setpieceType_metricvalue},
 			{"Item_triggered_metricvalue", ev.Value.Item_triggered_metricvalue},
 			{"RepositoryId", ev.Value.RepositoryId},
-		}}));
+		});
 	});
 	//eventName == "ItemDestroyed" // broken camcorder
 	//eventName == "TargetEscapeFoiled" // Yuki killed in Gondola
@@ -1129,6 +1135,7 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 	}
 	catch (const nlohmann::json::exception& ex) {
 		Logger::Error("JSON exception: {}", ex.what());
+		Logger::Error("{}", eventData);
 	}
 
 	return HookResult<void>(HookAction::Continue());

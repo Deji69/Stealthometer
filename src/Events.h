@@ -366,6 +366,28 @@ struct Event<Events::Actorsick> {
 };
 
 template<>
+struct Event<Events::Dart_Hit> {
+	static auto constexpr Name = "Dart_Hit";
+	struct EventValue {
+		std::string RepositoryId;
+		EActorType ActorType;
+		bool IsTarget;
+		bool Blind;
+		bool Sedative;
+		bool Sick;
+
+		EventValue(const nlohmann::json& json) :
+			RepositoryId(json.value("RepositoryId", "")),
+			ActorType(getActorTypeFromValue(json.value("ActorType", -1))),
+			IsTarget(json.value("IsTarget", false)),
+			Blind(json.find("Blind") != json.end()),
+			Sedative(json.find("Sedative") != json.end()),
+			Sick(json.find("Sick") != json.end())
+		{ }
+	};
+};
+
+template<>
 struct Event<Events::Trespassing> {
 	static auto constexpr Name = "Trespassing";
 	struct EventValue {
@@ -445,7 +467,7 @@ struct Event<Events::MurderedBodySeen> {
 
 		EventValue(const nlohmann::json& json) : DeadBody(json["DeadBody"]),
 			Witness(json.value("Witness", "")),
-			IsWitnessTarget(json.value("Witness", false))
+			IsWitnessTarget(json.value("IsWitnessTarget", false))
 		{}
 	};
 };
@@ -477,6 +499,18 @@ struct Event<Events::Unnoticed_Pacified> {
 template<>
 struct Event<Events::AllBodiesHidden> {
 	static auto constexpr Name = "AllBodiesHidden";
+	using EventValue = VoidEventValue;
+};
+
+template<>
+struct Event<Events::FirstMissedShot> {
+	static auto constexpr Name = "FirstMissedShot";
+	using EventValue = VoidEventValue;
+};
+
+template<>
+struct Event<Events::FirstNonHeadshot> {
+	static auto constexpr Name = "FirstNonHeadshot";
 	using EventValue = VoidEventValue;
 };
 
