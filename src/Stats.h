@@ -60,7 +60,7 @@ enum class ItemInfoType {
 
 struct ItemInfo
 {
-	ItemInfoType type;
+	ItemInfoType type = ItemInfoType::None;
 	std::string name;
 	std::string commonName;
 	std::string itemType;

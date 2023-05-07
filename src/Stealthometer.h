@@ -7,6 +7,7 @@
 #include <Glacier/ZEntity.h>
 #include <Glacier/ZInput.h>
 #include "json.hpp"
+#include "Events.h"
 #include "Stats.h"
 #include "StatWindow.h"
 #include "util.h"
@@ -16,7 +17,7 @@ struct ActorData
 	const TEntityRef<ZActor>* ref = nullptr;
 	bool isTarget = false;
 	int highestTensionLevel = 0;
-	ECompiledBehaviorType lastFrameBehaviour;
+	ECompiledBehaviorType lastFrameBehaviour = ECompiledBehaviorType::BT_Invalid;
 	std::string repoId;
 };
 
@@ -42,6 +43,7 @@ public:
 	auto GetSilentAssassinStatus() const -> SilentAssassinStatus;
 
 private:
+	auto SetupEvents() -> void;
 	auto DrawSettingsUI(bool focused) -> void;
 	auto DrawExpandedStatsUI(bool focused) -> void;
 	auto IsRepoIdTargetNPC(const std::string& id) const -> bool;
@@ -53,7 +55,6 @@ private:
 
 private:
 	//DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZGameStatsManager_SendAISignals, ZGameStatsManager* th);
-	//DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZKnowledge_SetGameTension, ZKnowledge* knowledge, EGameTension tension);
 	DECLARE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent, ZAchievementManagerSimple* th, uint32_t eventIndex, const ZDynamicObject& ev);
 
 private:
@@ -61,13 +62,14 @@ private:
 	Stats stats;
 	DisplayStats displayStats;
 	StatWindow window;
+	EventSystem events;
 	std::unordered_set<std::string, StringHashLowercase, InsensitiveCompare> freelanceTargets;
 	std::array<ActorData, 1000> actorData;
 	std::vector<std::string> eventHistory;
 	std::mt19937 randomGenerator;
 	std::unordered_map<std::string, nlohmann::json, StringHashLowercase, InsensitiveCompare> repo;
 	int npcCount = 0;
-	float cutsceneEndTime = 0;
+	double cutsceneEndTime = 0;
 	bool statVisibleUI = false;
 	bool externalWindowEnabled = true;
 	bool externalWindowDarkMode = true;
