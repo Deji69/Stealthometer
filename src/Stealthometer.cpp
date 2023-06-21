@@ -700,8 +700,12 @@ auto Stealthometer::SetupEvents() -> void {
 	});
 	events.listen<Events::Trespassing>([this](const ServerEvent<Events::Trespassing>& ev) {
 		stats.current.trespassing = ev.Value.IsTrespassing;
-		if (stats.current.trespassing)
+		if (stats.current.trespassing) {
+			stats.trespassStartTime = ev.Timestamp;
 			++stats.misc.timesTrespassed;
+		} else {
+			stats.misc.trespassTime += ev.Timestamp - stats.trespassStartTime;
+		}
 	});
 	events.listen<Events::SecuritySystemRecorder>([this](const ServerEvent<Events::SecuritySystemRecorder>& ev) {
 		if (this->IsContractEnded()) return;

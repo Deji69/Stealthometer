@@ -208,6 +208,7 @@ struct MiscStats
 	int shotsFired = 0;
 	int targetsMadeSick = 0;
 	int timesTrespassed = 0;
+	double trespassTime = 0;
 };
 
 struct CurrentStats
@@ -220,6 +221,8 @@ struct CurrentStats
 
 struct Stats
 {
+	double trespassStartTime = 0;
+	double currentTrespassTime = 0;
 	std::set<std::string, InsensitiveCompareLexicographic> witnesses;
 	std::set<std::string, InsensitiveCompareLexicographic> spottedBy;
 	std::set<std::string, InsensitiveCompareLexicographic> targetsSpottedBy;
