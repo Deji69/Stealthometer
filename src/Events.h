@@ -256,6 +256,12 @@ struct Event<Events::ContractStart> {
 };
 
 template<>
+struct Event<Events::ContractEnd> {
+	static auto constexpr Name = "ContractEnd";
+	using EventValue = VoidEventValue;
+};
+
+template<>
 struct Event<Events::IntroCutEnd> {
 	static auto constexpr Name = "IntroCutEnd";
 	using EventValue = VoidEventValue;
@@ -426,6 +432,12 @@ struct Event<Events::Agility_Start> {
 template<>
 struct Event<Events::Drain_Pipe_Climbed> {
 	static auto constexpr Name = "Drain_Pipe_Climbed";
+	using EventValue = VoidEventValue;
+};
+
+template<>
+struct Event<Events::ExitGate> {
+	static auto constexpr Name = "exit_gate";
 	using EventValue = VoidEventValue;
 };
 

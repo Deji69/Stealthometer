@@ -331,6 +331,7 @@ auto Stealthometer::NewContract() -> void {
 	this->stats = Stats();
 	this->displayStats = DisplayStats();
 	this->npcCount = 0;
+	this->missionEndTime = 0;
 	this->cutsceneEndTime = 0;
 	this->freelanceTargets.clear();
 	this->eventHistory.clear();
@@ -610,9 +611,20 @@ auto Stealthometer::UpdateDisplayStats() -> void {
 	if (updated) this->window.update();
 }
 
+auto Stealthometer::IsContractEnded() const -> bool {
+	return this->missionEndTime > 0;
+}
+
 auto Stealthometer::SetupEvents() -> void {
-	events.listen<Events::ContractStart>([this](auto& ev){
+	events.listen<Events::ContractStart>([this](auto& ev) {
 		this->NewContract();
+	});
+	events.listen<Events::ContractEnd>([this](const ServerEvent<Events::ContractEnd>& ev) {
+		if (this->IsContractEnded()) return;
+		this->missionEndTime = ev.Timestamp;
+	});
+	events.listen<Events::ExitGate>([this](const ServerEvent<Events::ExitGate>& ev) {
+		this->missionEndTime = ev.Timestamp;
 	});
 	events.listen<Events::IntroCutEnd>([this](const ServerEvent<Events::IntroCutEnd>& ev) {
 		this->cutsceneEndTime = ev.Timestamp;
@@ -692,6 +704,8 @@ auto Stealthometer::SetupEvents() -> void {
 			++stats.misc.timesTrespassed;
 	});
 	events.listen<Events::SecuritySystemRecorder>([this](const ServerEvent<Events::SecuritySystemRecorder>& ev) {
+		if (this->IsContractEnded()) return;
+
 		bool destroyed = false;
 		switch (ev.Value.event) {
 			case SecuritySystemRecorderEvent::Spotted:
@@ -727,6 +741,9 @@ auto Stealthometer::SetupEvents() -> void {
 	// eventually sends other body found events with correct IDs. Need a good solution
 	// to link these events to reliably obtain the necessary information.
 	events.listen<Events::AccidentBodyFound>([this](const ServerEvent<Events::AccidentBodyFound>& ev) {
+		Logger::Debug("{} AccidentBodyFound: {}", ev.Timestamp, ev.json.dump());
+		if (this->IsContractEnded()) return;
+
 		if (this->IsRepoIdTargetNPC(ev.Value.DeadBody.RepositoryId))
 			++stats.bodies.targetsFound;
 
@@ -734,9 +751,14 @@ auto Stealthometer::SetupEvents() -> void {
 		++stats.bodies.foundAccidents;
 	});
 	events.listen<Events::DeadBodySeen>([this](const ServerEvent<Events::DeadBodySeen>& ev) {
+		Logger::Debug("{} DeadBodySeen: {}", ev.Timestamp, ev.json.dump());
+		if (this->IsContractEnded()) return;
 		++stats.bodies.deadSeen;
 	});
 	events.listen<Events::MurderedBodySeen>([this](const ServerEvent<Events::MurderedBodySeen>& ev) {
+		Logger::Debug("{} MurderedBodySeen: {}", ev.Timestamp, ev.json.dump());
+		if (this->IsContractEnded()) return;
+
 		auto const& value = ev.Value;
 		auto const& deadBody = value.DeadBody;
 		auto const foundMurderedInfoIt = stats.bodies.foundMurderedInfos.find(deadBody.RepositoryId);
@@ -780,6 +802,9 @@ auto Stealthometer::SetupEvents() -> void {
 		}
 	});
 	events.listen<Events::BodyFound>([this](const ServerEvent<Events::BodyFound>& ev) {
+		Logger::Debug("{} BodyFound: {}", ev.Timestamp, ev.json.dump());
+		if (this->IsContractEnded()) return;
+
 		auto const& id = ev.Value.DeadBody.RepositoryId;
 
 		if (ev.Value.DeadBody.IsCrowdActor)
@@ -815,6 +840,8 @@ auto Stealthometer::SetupEvents() -> void {
 		stats.misc.shotsFired = ev.Value.Total;
 	});
 	events.listen<Events::Spotted>([this](const ServerEvent<Events::Spotted>& ev) {
+		if (this->IsContractEnded()) return;
+
 		for (const auto& name : ev.Value.value) {
 			auto isTarget = this->IsRepoIdTargetNPC(name);
 
@@ -830,11 +857,15 @@ auto Stealthometer::SetupEvents() -> void {
 		}
 	});
 	events.listen<Events::Witnesses>([this](const ServerEvent<Events::Witnesses>& ev) {
+		if (this->IsContractEnded()) return;
+
 		for (const auto& name : ev.Value.value) {
 			stats.witnesses.insert(name);
 		}
 	});
 	events.listen<Events::DisguiseBlown>([this](const ServerEvent<Events::DisguiseBlown>& ev) {
+		if (this->IsContractEnded()) return;
+
 		stats.current.disguiseBlown = true;
 		stats.disguisesBlown.insert(ev.Value.value);
 	});
@@ -843,6 +874,8 @@ auto Stealthometer::SetupEvents() -> void {
 		stats.disguisesBlown.erase(ev.Value.value);
 	});
 	events.listen<Events::_47_FoundTrespassing>([this](const ServerEvent<Events::_47_FoundTrespassing>& ev) {
+		if (this->IsContractEnded()) return;
+
 		++stats.detection.caughtTrespassing;
 	});
 	events.listen<Events::TargetEliminated>([this](const ServerEvent<Events::TargetEliminated>& ev) {
@@ -852,17 +885,23 @@ auto Stealthometer::SetupEvents() -> void {
 		++stats.misc.doorsUnlocked;
 	});
 	events.listen<Events::CrowdNPC_Died>([this](const ServerEvent<Events::CrowdNPC_Died>& ev) {
+		if (this->IsContractEnded()) return;
+
 		++stats.kills.total;
 		++stats.kills.crowd;
 		++stats.kills.civilian;
 	});
 	events.listen<Events::NoticedKill>([this](const ServerEvent<Events::NoticedKill>& ev) {
+		if (this->IsContractEnded()) return;
+
 		// TODO:
 		//ev.Value.RepositoryId
 		//ev.Value.IsTarget
 		++stats.kills.noticed;
 	});
 	events.listen<Events::Noticed_Pacified>([this](const ServerEvent<Events::Noticed_Pacified>& ev) {
+		if (this->IsContractEnded()) return;
+
 		// TODO:
 		//ev.Value.RepositoryId
 		//ev.Value.IsTarget
@@ -885,6 +924,8 @@ auto Stealthometer::SetupEvents() -> void {
 			++stats.pacifies.unnoticedNonTarget;
 	});
 	events.listen<Events::AmbientChanged>([this](const ServerEvent<Events::AmbientChanged>& ev) {
+		if (this->IsContractEnded()) return;
+
 		stats.current.tension = ev.Value.AmbientValue;
 
 		switch (ev.Value.AmbientValue) {
@@ -916,6 +957,8 @@ auto Stealthometer::SetupEvents() -> void {
 			stats.tension.level += getTensionValue(ev.Value.AmbientValue) - getTensionValue(ev.Value.PreviousAmbientValue);
 	});
 	events.listen<Events::Pacify>([this](const ServerEvent<Events::Pacify>& ev) {
+		if (this->IsContractEnded()) return;
+
 		stats.bodies.allHidden = false;
 		++stats.pacifies.total;
 
@@ -932,6 +975,8 @@ auto Stealthometer::SetupEvents() -> void {
 		}
 	});
 	events.listen<Events::Kill>([this](const ServerEvent<Events::Kill>& ev) {
+		if (this->IsContractEnded()) return;
+
 		const auto& repoId = ev.Value.RepositoryId;
 		const auto isTarget = ev.Value.IsTarget;
 

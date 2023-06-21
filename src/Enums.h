@@ -1,4 +1,5 @@
 #pragma once
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <Glacier/Enums.h>
@@ -32,6 +33,7 @@ enum class Events {
 	BodyHidden,
 	BrokenDisguiseCleared,
 	ContractStart,
+	ContractEnd,
 	CrowdNPC_Died,
 	Dart_Hit,
 	DeadBodySeen,
@@ -39,6 +41,7 @@ enum class Events {
 	DisguiseBlown,
 	Door_Unlocked,
 	Drain_Pipe_Climbed,
+	ExitGate,
 	FirstMissedShot,
 	FirstNonHeadshot,
 	HoldingIllegalWeapon,

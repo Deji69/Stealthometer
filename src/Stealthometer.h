@@ -21,10 +21,6 @@ struct ActorData
 	std::string repoId;
 };
 
-enum class StealthometerPlaystyle
-{
-};
-
 class Stealthometer : public IPluginInterface
 {
 public:
@@ -46,6 +42,7 @@ private:
 	auto SetupEvents() -> void;
 	auto DrawSettingsUI(bool focused) -> void;
 	auto DrawExpandedStatsUI(bool focused) -> void;
+	auto IsContractEnded() const -> bool;
 	auto IsRepoIdTargetNPC(const std::string& id) const -> bool;
 	auto GetRepoEntry(const std::string& id) -> const nlohmann::json*;
 	auto CreateItemInfo(const std::string& repoId) -> ItemInfo;
@@ -70,6 +67,8 @@ private:
 	std::unordered_map<std::string, nlohmann::json, StringHashLowercase, InsensitiveCompare> repo;
 	int npcCount = 0;
 	double cutsceneEndTime = 0;
+	double missionEndTime = 0;
+	double lastEventTimestamp = 0;
 	bool statVisibleUI = false;
 	bool externalWindowEnabled = true;
 	bool externalWindowDarkMode = true;
