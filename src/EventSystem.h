@@ -14,6 +14,7 @@ template<Events T>
 class ServerEvent
 {
 public:
+	nlohmann::json json;
 	typename Event<T>::EventValue Value;
 	std::string ContractSessionId;
 	std::string ContractId;
@@ -62,6 +63,7 @@ protected:
 		if (it == ev.end()) return false;
 
 		ServerEvent<TEvent> serverEvent{typename Event<TEvent>::EventValue(*it)};
+		serverEvent.json  = ev;
 		serverEvent.Name = ev.value("Name", "");
 		serverEvent.ContractId = ev.value("ContractId", "");
 		serverEvent.ContractSessionId = ev.value("ContractSessionId", "");
@@ -69,6 +71,7 @@ protected:
 
 		for (auto& handler : this->handlers)
 			handler(serverEvent);
+
 		return this->handlers.size() > 0;
 	}
 
