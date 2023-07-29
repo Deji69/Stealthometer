@@ -244,7 +244,7 @@ struct Event<Events::ContractStart> {
 			}
 			Disguise = value.value("Disguise", "");
 			LocationId = value.value("LocationId", "");
-			ContractType = *getMissionTypeFromString(value.value("ContractType", ""));
+			ContractType = getMissionTypeFromString(value.value("ContractType", "")).value_or(MissionType::Unknown);
 			DifficultyLevel = value.value<int>("DifficultyLevel", -1);
 			IsVR = value.value<bool>("IsVR", false);
 			IsHitmanSuit = value.value<bool>("IsHitmanSuit", false);

@@ -5,6 +5,7 @@
 #include <Glacier/Enums.h>
 
 enum class MissionType {
+	Unknown,
 	Arcade,
 	Campaign,
 	Creation,
@@ -92,6 +93,7 @@ inline auto getMissionTypeFromString(const std::string& str) -> std::optional<Mi
 	static const std::unordered_map<std::string, MissionType> map = {{
 		{"arcade", MissionType::Arcade},
 		{"campaign", MissionType::Campaign},
+		{"creation", MissionType::Creation},
 		{"elusive", MissionType::Elusive},
 		{"escalation", MissionType::Escalation},
 		{"evergreen", MissionType::Evergreen},
