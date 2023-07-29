@@ -4,6 +4,7 @@
 #include <string>
 #include <unordered_set>
 #include <Glacier/Enums.h>
+#include "Enums.h"
 #include "PlayStyleRating.h"
 #include "util.h"
 
@@ -60,7 +61,7 @@ enum class ItemInfoType {
 
 struct ItemInfo
 {
-	ItemInfoType type;
+	ItemInfoType type = ItemInfoType::None;
 	std::string name;
 	std::string commonName;
 	std::string itemType;
@@ -105,8 +106,15 @@ struct KillMethodStats
 
 struct KillStats
 {
-	std::set<std::string> targets;
-	std::set<std::string> nonTargets;
+	struct NoticedKillInfo
+	{
+		std::map<std::string, bool, InsensitiveCompareLexicographic> sightings;
+		bool isSightedByNonTarget = false;
+	};
+
+	std::set<std::string, InsensitiveCompareLexicographic> targets;
+	std::set<std::string, InsensitiveCompareLexicographic> nonTargets;
+	std::unordered_map<std::string, NoticedKillInfo, StringHashLowercase, InsensitiveCompare> noticedKillInfos;
 	int total = 0;
 	int noticed = 0;
 	int unnoticed = 0;
@@ -144,6 +152,7 @@ struct BodyStats
 		bool isSightedByNonTarget = false;
 	};
 
+	std::set<std::string, InsensitiveCompareLexicographic> uniqueBodiesFound;
 	std::unordered_map<std::string, MurderedBodyFoundInfo, StringHashLowercase, InsensitiveCompare> foundMurderedInfos;
 	bool allHidden = false;
 	bool allTargetsHidden = false;
@@ -208,6 +217,7 @@ struct MiscStats
 	int shotsFired = 0;
 	int targetsMadeSick = 0;
 	int timesTrespassed = 0;
+	double trespassTime = 0;
 };
 
 struct CurrentStats
@@ -220,10 +230,26 @@ struct CurrentStats
 
 struct Stats
 {
+	struct WitnessEvent {
+		double timestamp;
+		Events event;
+		std::string bodyId;
+		std::string witnessId;
+		bool isWitnessTarget;
+
+		WitnessEvent(double timestamp, Events event, std::string witnessId, bool isWitnessTarget, std::string bodyId = "") :
+			timestamp(timestamp), event(event), witnessId(witnessId), bodyId(bodyId), isWitnessTarget(isWitnessTarget)
+		{}
+	};
+
+	double trespassStartTime = 0;
+	double currentTrespassTime = 0;
+	std::vector<WitnessEvent> witnessEvents;
 	std::set<std::string, InsensitiveCompareLexicographic> witnesses;
 	std::set<std::string, InsensitiveCompareLexicographic> spottedBy;
 	std::set<std::string, InsensitiveCompareLexicographic> targetsSpottedBy;
 	std::set<std::string, InsensitiveCompareLexicographic> targetBodyWitnesses;
+	std::set<std::string, InsensitiveCompareLexicographic> targetKillNoticers;
 	std::set<std::string, InsensitiveCompareLexicographic> disguisesBlown;
 	std::map<std::string, ItemInfo, InsensitiveCompareLexicographic> itemsObtained;
 	std::map<std::string, ItemInfo, InsensitiveCompareLexicographic> itemsDisposed;

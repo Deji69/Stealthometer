@@ -320,6 +320,7 @@ auto StatWindow::create(HINSTANCE instance) -> void
 
 		ShowWindow(this->hWnd, SW_SHOW);
 		UpdateWindow(this->hWnd);
+		PostMessage(this->hWnd, STEALTHOMETER_UPDATE_WINDOW, 0, 0);
 
 		auto msg = MSG{};
 

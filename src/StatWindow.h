@@ -57,7 +57,7 @@ private:
 	HWND column2 = nullptr;
 	ATOM wclAtom = NULL;
 	bool darkMode = true;
-	bool onTop = false;
+	bool onTop = true;
 	bool wasOnTop = false;
 
 	std::thread windowThread;
