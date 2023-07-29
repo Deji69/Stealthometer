@@ -112,8 +112,8 @@ struct KillStats
 		bool isSightedByNonTarget = false;
 	};
 
-	std::set<std::string> targets;
-	std::set<std::string> nonTargets;
+	std::set<std::string, InsensitiveCompareLexicographic> targets;
+	std::set<std::string, InsensitiveCompareLexicographic> nonTargets;
 	std::unordered_map<std::string, NoticedKillInfo, StringHashLowercase, InsensitiveCompare> noticedKillInfos;
 	int total = 0;
 	int noticed = 0;
@@ -152,7 +152,7 @@ struct BodyStats
 		bool isSightedByNonTarget = false;
 	};
 
-	std::set<std::string, InsensitiveCompare> uniqueBodiesFound;
+	std::set<std::string, InsensitiveCompareLexicographic> uniqueBodiesFound;
 	std::unordered_map<std::string, MurderedBodyFoundInfo, StringHashLowercase, InsensitiveCompare> foundMurderedInfos;
 	bool allHidden = false;
 	bool allTargetsHidden = false;
