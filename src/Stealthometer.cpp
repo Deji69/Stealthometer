@@ -802,6 +802,8 @@ auto Stealthometer::SetupEvents() -> void {
 		if (stats.bodies.uniqueBodiesFound.emplace(bodyId).second) {
 			if (this->IsRepoIdTargetNPC(bodyId))
 				++stats.bodies.targetsFound;
+
+			++stats.bodies.found;
 			++stats.bodies.foundAccidents;
 		}
 	});
