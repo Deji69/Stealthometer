@@ -202,7 +202,7 @@ auto Stealthometer::DrawExpandedStatsUI(bool focused) -> void {
 	ImGui::PushFont(SDK()->GetImGuiBlackFont());
 
 	if (this->killsWindowOpen) {
-		ImGui::SetNextWindowSizeConstraints(ImVec2 { 250, 200 }, ImVec2 { 600, -1 });
+		ImGui::SetNextWindowSizeConstraints(ImVec2{250, 200}, ImVec2{600, -1});
 
 		if (ImGui::Begin(ICON_MD_PIE_CHART " KILLS", &this->killsWindowOpen)) {
 			ImGui::PushFont(SDK()->GetImGuiRegularFont());
@@ -451,26 +451,28 @@ auto Stealthometer::GetSilentAssassinStatus() const -> SilentAssassinStatus {
 	auto spottedByNotKilled = this->stats.spottedBy | std::views::filter(std::not_fn(isKilled));
 	auto witnessesNonTarget = witnessesNotKilled | std::views::filter(std::not_fn(isTarget));
 	auto spottedByNonTarget = spottedByNotKilled | std::views::filter(std::not_fn(isTarget));
-	auto numWitnesses = std::distance(witnessesNotKilled.begin(), witnessesNotKilled.end());
-	auto numSpottedBy = std::distance(spottedByNotKilled.begin(), spottedByNotKilled.end());
-	auto numWitnessesNT = std::distance(witnessesNotKilled.begin(), witnessesNotKilled.end());
-	auto numSpottedByNT = std::distance(spottedByNotKilled.begin(), spottedByNotKilled.end());
+	auto numWitnessesNT = std::distance(witnessesNonTarget.begin(), witnessesNonTarget.end());
+	auto numSpottedByNT = std::distance(spottedByNonTarget.begin(), spottedByNonTarget.end());
 
 	if (numWitnessesNT > 0 || numSpottedByNT > 0)
 		return SilentAssassinStatus::Fail;
 
+	// TODO: Learn if there are any situations that invalidate 'No Noticed Kills' independently from 'Never Spotted'.
+	// Otherwise, it's pointless considering this for SA tracking. 'No Noticed Kills' is seemingly not based on noticed kills.
+	
 	// Noticed Kills
-	if (stats.kills.noticed > 0)
-		return SilentAssassinStatus::Fail;
+	//if (stats.kills.noticed > 0)
+	//	return SilentAssassinStatus::Fail;
 
-	// Bodies Found
+	// Bodies Found - if body found by non-target, it's definitely not recoverable.
 	if (this->stats.bodies.foundMurderedByNonTarget > 0)
 		return SilentAssassinStatus::Fail;
 
+	// We can shortcut the target redeemable SA logic by comparing the number of target witnesses vs. the number of target witnesses killed.
 	auto spottedByTarget = this->stats.targetBodyWitnesses.size() > this->stats.bodies.targetBodyWitnessesKilled
 		|| this->stats.targetsSpottedBy.size() > this->stats.detection.targetsSpottedByAndKilled;
 
-	// Evidence
+	// Evidence - also redeemable. Check if we have redeemability from both target and cams.
 	if (this->stats.detection.onCamera) {
 		if (spottedByTarget)
 			return SilentAssassinStatus::RedeemableCameraAndTarget;
@@ -616,6 +618,45 @@ auto Stealthometer::IsContractEnded() const -> bool {
 }
 
 auto Stealthometer::SetupEvents() -> void {
+	// Helper to be called when a body found event is sent with a valid repo ID.
+	auto onRealBodyFound = [this](const Stats::WitnessEvent& ev) {
+		auto const foundMurderedInfoIt = stats.bodies.foundMurderedInfos.find(ev.bodyId);
+		auto const bodyAlreadyFound = foundMurderedInfoIt != stats.bodies.foundMurderedInfos.end();
+
+		// If already found, just keep track of target vs. non-target sightings.
+		if (bodyAlreadyFound) {
+			if (ev.isWitnessTarget)
+				stats.targetBodyWitnesses.emplace(ev.witnessId);
+			else if (!foundMurderedInfoIt->second.isSightedByNonTarget) {
+				foundMurderedInfoIt->second.isSightedByNonTarget = true;
+				++stats.bodies.foundMurderedByNonTarget;
+			}
+
+			foundMurderedInfoIt->second.sightings.try_emplace(ev.witnessId, ev.isWitnessTarget);
+			return;
+		}
+
+		// Increment these only when this body was not already found as an 'accident' body.
+		if (stats.bodies.uniqueBodiesFound.emplace(ev.bodyId).second) {
+			if (this->IsRepoIdTargetNPC(ev.bodyId))
+				++this->stats.bodies.targetsFound;
+			++stats.bodies.found;
+		}
+
+		// Even if body already found, this is the first time it's found 'murdered' (e.g. since dragging an already found accident body).
+		++stats.bodies.foundMurdered;
+
+		// Track target body witnesses so they may be compared against the number of target body witnesses killed for redeemable SA tracking.
+		if (ev.isWitnessTarget)
+			stats.targetBodyWitnesses.emplace(ev.witnessId);
+		else
+			++stats.bodies.foundMurderedByNonTarget;
+
+		BodyStats::MurderedBodyFoundInfo bodyFoundInfo;
+		bodyFoundInfo.sightings.emplace(ev.witnessId, ev.isWitnessTarget);
+		bodyFoundInfo.isSightedByNonTarget = !ev.isWitnessTarget;
+		stats.bodies.foundMurderedInfos.try_emplace(ev.bodyId, std::move(bodyFoundInfo));
+	};
 	events.listen<Events::ContractStart>([this](auto& ev) {
 		this->NewContract();
 	});
@@ -642,8 +683,9 @@ auto Stealthometer::SetupEvents() -> void {
 		}
 	});
 	events.listen<Events::ItemPickedUp>([this](const ServerEvent<Events::ItemPickedUp>& ev) {
+		if (this->IsContractEnded()) return;
 		// TODO: bit of a hacky workaround to fix Freelancer loadout items counting as picked up
-		// ignore any items picked up in the first 3 seconds (+ subtract for cutscene length)
+		// ignore any items picked up in the first 3 seconds (+ compensate for cutscene length)
 		auto time = ev.Timestamp;
 		time -= this->cutsceneEndTime;
 
@@ -660,6 +702,7 @@ auto Stealthometer::SetupEvents() -> void {
 		}
 	});
 	events.listen<Events::ItemDropped>([this](const ServerEvent<Events::ItemDropped>& ev) {
+		if (this->IsContractEnded()) return;
 		++stats.misc.itemsDropped;
 
 		auto& id = ev.Value.RepositoryId;
@@ -670,6 +713,7 @@ auto Stealthometer::SetupEvents() -> void {
 		}
 	});
 	events.listen<Events::ItemThrown>([this](const ServerEvent<Events::ItemThrown>& ev) {
+		if (this->IsContractEnded()) return;
 		// inventory removal handled in ItemRemovedFromInventory
 		++stats.misc.itemsThrown;
 
@@ -677,6 +721,7 @@ auto Stealthometer::SetupEvents() -> void {
 		this->AddDisposedItem(ev.Value.RepositoryId, item);
 	});
 	events.listen<Events::ItemRemovedFromInventory>([this](const ServerEvent<Events::ItemRemovedFromInventory>& ev) {
+		if (this->IsContractEnded()) return;
 		++stats.misc.itemsRemovedFromInventory;
 		this->RemoveObtainedItem(ev.Value.RepositoryId);
 	});
@@ -687,6 +732,7 @@ auto Stealthometer::SetupEvents() -> void {
 		// TODO: ?
 	});
 	events.listen<Events::Actorsick>([this](const ServerEvent<Events::Actorsick>& ev) {
+		if (this->IsContractEnded()) return;
 		if (ev.Value.IsTarget) ++stats.misc.targetsMadeSick;
 		Logger::Debug("{} ActorSick: {}", ev.Timestamp, nlohmann::json{
 			{"ActorId", ev.Value.ActorId},
@@ -699,6 +745,8 @@ auto Stealthometer::SetupEvents() -> void {
 		}.dump());
 	});
 	events.listen<Events::Trespassing>([this](const ServerEvent<Events::Trespassing>& ev) {
+		if (this->IsContractEnded()) return;
+
 		stats.current.trespassing = ev.Value.IsTrespassing;
 		if (stats.current.trespassing) {
 			stats.trespassStartTime = ev.Timestamp;
@@ -748,71 +796,50 @@ auto Stealthometer::SetupEvents() -> void {
 		Logger::Debug("{} AccidentBodyFound: {}", ev.Timestamp, ev.json.dump());
 		if (this->IsContractEnded()) return;
 
-		if (this->IsRepoIdTargetNPC(ev.Value.DeadBody.RepositoryId))
-			++stats.bodies.targetsFound;
+		const auto& bodyId = ev.Value.DeadBody.RepositoryId;
 
-		++stats.bodies.found;
-		++stats.bodies.foundAccidents;
+		// Count only if this body is found for the first time, and ensure we don't double count if the body gets dragged and found again.
+		if (stats.bodies.uniqueBodiesFound.emplace(bodyId).second) {
+			if (this->IsRepoIdTargetNPC(bodyId))
+				++stats.bodies.targetsFound;
+			++stats.bodies.foundAccidents;
+		}
 	});
 	events.listen<Events::DeadBodySeen>([this](const ServerEvent<Events::DeadBodySeen>& ev) {
 		Logger::Debug("{} DeadBodySeen: {}", ev.Timestamp, ev.json.dump());
 		if (this->IsContractEnded()) return;
 		++stats.bodies.deadSeen;
 	});
-	events.listen<Events::MurderedBodySeen>([this](const ServerEvent<Events::MurderedBodySeen>& ev) {
+	events.listen<Events::MurderedBodySeen>([this, onRealBodyFound](const ServerEvent<Events::MurderedBodySeen>& ev) {
 		Logger::Debug("{} MurderedBodySeen: {}", ev.Timestamp, ev.json.dump());
 		if (this->IsContractEnded()) return;
 
 		auto const& value = ev.Value;
 		auto const& deadBody = value.DeadBody;
-		auto const foundMurderedInfoIt = stats.bodies.foundMurderedInfos.find(deadBody.RepositoryId);
-		auto const bodyAlreadyFound = foundMurderedInfoIt != stats.bodies.foundMurderedInfos.end();
-		auto const bodyAlreadyFoundByNonTarget = bodyAlreadyFound && foundMurderedInfoIt->second.isSightedByNonTarget;
+		auto const deadBodyId = deadBody.IsCrowdActor ? "" : deadBody.RepositoryId;
 
-		if (ev.Value.DeadBody.IsCrowdActor) { }
-		else if (bodyAlreadyFound) {
-			if (value.IsWitnessTarget) {
-				stats.targetBodyWitnesses.emplace(value.Witness);
-			}
-			else if (!bodyAlreadyFoundByNonTarget) {
-				foundMurderedInfoIt->second.isSightedByNonTarget = true;
-				++stats.bodies.foundMurderedByNonTarget;
-			}
+		stats.witnessEvents.emplace_back(ev.Timestamp, Events::MurderedBodySeen, value.Witness, value.IsWitnessTarget, deadBodyId);
 
-			foundMurderedInfoIt->second.sightings.try_emplace(value.Witness, value.IsWitnessTarget);
-		}
-		else {
-			if (this->IsRepoIdTargetNPC(deadBody.RepositoryId))
-				++this->stats.bodies.targetsFound;
-
-			++stats.bodies.found;
-			++stats.bodies.foundMurdered;
-
-			if (value.IsWitnessTarget) {
-				stats.targetBodyWitnesses.emplace(value.Witness);
-			}
-			else {
-				++stats.bodies.foundMurderedByNonTarget;
-			}
-
-			if (ev.Value.DeadBody.IsCrowdActor) {
-				++stats.bodies.foundCrowdMurders;
-			}
-
-			BodyStats::MurderedBodyFoundInfo bodyFoundInfo;
-			bodyFoundInfo.sightings.emplace(value.Witness, value.IsWitnessTarget);
-			bodyFoundInfo.isSightedByNonTarget = !value.IsWitnessTarget;
-			stats.bodies.foundMurderedInfos.try_emplace(deadBody.RepositoryId, std::move(bodyFoundInfo));
-		}
+		if (!deadBodyId.empty()) onRealBodyFound(stats.witnessEvents.back());
 	});
-	events.listen<Events::BodyFound>([this](const ServerEvent<Events::BodyFound>& ev) {
+	events.listen<Events::BodyFound>([this, onRealBodyFound](const ServerEvent<Events::BodyFound>& ev) {
 		Logger::Debug("{} BodyFound: {}", ev.Timestamp, ev.json.dump());
-		if (this->IsContractEnded()) return;
 
 		auto const& id = ev.Value.DeadBody.RepositoryId;
 
-		if (ev.Value.DeadBody.IsCrowdActor)
+		if (ev.Value.DeadBody.IsCrowdActor) {
+			if (this->IsContractEnded()) return;
 			++stats.bodies.foundCrowd;
+		}
+		else {
+			for (auto it = stats.witnessEvents.rbegin(); it != stats.witnessEvents.rend(); ++it) {
+				if (it->timestamp != ev.Timestamp) break; // floating-point equality comparison - should be low enough precision to be fine?
+				if (it->event != Events::MurderedBodySeen) continue;
+				if (!it->bodyId.empty()) continue;
+				it->bodyId = id;
+				onRealBodyFound(*it);
+			}
+		}
 	});
 	events.listen<Events::Disguise>([this](const ServerEvent<Events::Disguise>& ev) {
 		++stats.misc.disguisesTaken;
@@ -828,15 +855,19 @@ auto Stealthometer::SetupEvents() -> void {
 		++stats.detection.situationsContained;
 	});
 	events.listen<Events::TargetBodySpotted>([this](const ServerEvent<Events::TargetBodySpotted>& ev) {
+		if (this->IsContractEnded()) return;
 		++stats.bodies.targetsFound;
 	});
 	events.listen<Events::BodyHidden>([this](const ServerEvent<Events::BodyHidden>& ev) {
+		if (this->IsContractEnded()) return;
 		++stats.bodies.hidden;
 	});
 	events.listen<Events::BodyBagged>([this](const ServerEvent<Events::BodyBagged>& ev) {
+		if (this->IsContractEnded()) return;
 		++stats.bodies.bagged;
 	});
 	events.listen<Events::AllBodiesHidden>([this](const ServerEvent<Events::AllBodiesHidden>& ev) {
+		if (this->IsContractEnded()) return;
 		stats.bodies.allHidden = true;
 	});
 	events.listen<Events::ShotsFired>([this](const ServerEvent<Events::ShotsFired>& ev) {
@@ -874,6 +905,8 @@ auto Stealthometer::SetupEvents() -> void {
 		stats.disguisesBlown.insert(ev.Value.value);
 	});
 	events.listen<Events::BrokenDisguiseCleared>([this](const ServerEvent<Events::BrokenDisguiseCleared>& ev) {
+		if (this->IsContractEnded()) return;
+
 		stats.current.disguiseBlown = false;
 		stats.disguisesBlown.erase(ev.Value.value);
 	});
@@ -886,6 +919,8 @@ auto Stealthometer::SetupEvents() -> void {
 		//++stats.kills.targets; // is this event sent in all target kill cases?
 	});
 	events.listen<Events::Door_Unlocked>([this](const ServerEvent<Events::Door_Unlocked>& ev) {
+		if (this->IsContractEnded()) return;
+
 		++stats.misc.doorsUnlocked;
 	});
 	events.listen<Events::CrowdNPC_Died>([this](const ServerEvent<Events::CrowdNPC_Died>& ev) {
@@ -898,9 +933,33 @@ auto Stealthometer::SetupEvents() -> void {
 	events.listen<Events::NoticedKill>([this](const ServerEvent<Events::NoticedKill>& ev) {
 		if (this->IsContractEnded()) return;
 
+		Logger::Debug("{} NoticedKill: {}", ev.Timestamp, ev.json.dump());
+
 		// TODO:
 		//ev.Value.RepositoryId
 		//ev.Value.IsTarget
+		auto const& value = ev.Value;
+		auto const noticedKillInfoIt = stats.kills.noticedKillInfos.find(value.RepositoryId);
+		auto const killAlreadyNoticed = noticedKillInfoIt != stats.kills.noticedKillInfos.end();
+		auto const killAlreadyNoticedByNonTarget = killAlreadyNoticed && noticedKillInfoIt->second.isSightedByNonTarget;
+		auto witnessId = std::string("");
+
+		for (auto it = stats.witnessEvents.crbegin(); it != stats.witnessEvents.crend(); ++it) {
+			if (it->timestamp != ev.Timestamp) break;
+			if (!it->witnessId.empty()) {
+				witnessId = it->witnessId;
+				break;
+			}
+		}
+
+		stats.witnessEvents.emplace_back(ev.Timestamp, Events::NoticedKill, witnessId, false, value.RepositoryId);
+
+		if (killAlreadyNoticed) {
+			if (value.IsTarget) {
+				//stats.targetKillNoticers.emplace(value.)
+			}
+		}
+
 		++stats.kills.noticed;
 	});
 	events.listen<Events::Noticed_Pacified>([this](const ServerEvent<Events::Noticed_Pacified>& ev) {
@@ -1172,6 +1231,9 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 	try {
 		auto json = nlohmann::json::parse(fixedEventDataStr.c_str(), fixedEventDataStr.c_str() + fixedEventDataStr.size());
 		auto const eventName = json.value("Name", "");
+		auto const timestamp = json.value("Timestamp", 0.0);
+
+		if (timestamp) lastEventTimestamp = timestamp;
 
 		if (!eventNameBlacklist.contains(eventName)) {
 			if (!events.handle(eventName, json))
