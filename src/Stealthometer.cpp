@@ -1065,6 +1065,8 @@ auto Stealthometer::SetupEvents() -> void {
 					++stats.bodies.targetBodyWitnessesKilled;
 			}
 		}
+		else if (ev.Value.KillContext == EDeathContext::eDC_NOT_HERO)
+			stats.kills.proxyDeaths.emplace(repoId);
 		else {
 			auto res = stats.kills.nonTargets.emplace(repoId);
 			if (res.second) {

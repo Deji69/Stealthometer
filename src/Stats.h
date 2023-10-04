@@ -114,6 +114,7 @@ struct KillStats
 
 	std::set<std::string, InsensitiveCompareLexicographic> targets;
 	std::set<std::string, InsensitiveCompareLexicographic> nonTargets;
+	std::set<std::string, InsensitiveCompareLexicographic> proxyDeaths;
 	std::unordered_map<std::string, NoticedKillInfo, StringHashLowercase, InsensitiveCompare> noticedKillInfos;
 	int total = 0;
 	int noticed = 0;
