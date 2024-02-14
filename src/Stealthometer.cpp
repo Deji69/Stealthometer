@@ -1221,7 +1221,7 @@ auto Stealthometer::SetupEvents() -> void {
 			{"setpieceType_metricvalue", ev.Value.setpieceType_metricvalue},
 			{"Item_triggered_metricvalue", ev.Value.Item_triggered_metricvalue},
 			{"RepositoryId", ev.Value.RepositoryId},
-		});
+		}.dump());
 	});
 	//eventName == "ItemDestroyed" // broken camcorder
 	//eventName == "TargetEscapeFoiled" // Yuki killed in Gondola

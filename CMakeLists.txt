@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.15)
 project(Stealthometer CXX)
 
 # Find latest version at https://github.com/OrfeasZ/ZHMModSDK/releases
-set(ZHMMODSDK_VER "v2.0.0-rc.1")
+set(ZHMMODSDK_VER "v2.0.0-rc.3")
 include(cmake/setup-zhmmodsdk.cmake)
 
 # Download CMakeRC resource compiler
@@ -23,10 +23,14 @@ add_library(Stealthometer SHARED
 	"src/Stealthometer.h"
  "src/Stats.h" "src/StatWindow.h" "src/StatWindow.cpp" "src/FixMinMax.h"
  "src/Rating.h" "src/Rating.cpp" "src/PlayStyleRating.h" "src/util.h" "src/Events.h" "src/EventSystem.h" "src/EventSystem.cpp" "src/Enums.h")
+ 
+find_package(directx-headers CONFIG REQUIRED)
 
 target_link_libraries(Stealthometer PRIVATE
 	ZHMModSDK
 	stealthometer::rc
+	Microsoft::DirectX-Guids
+	Microsoft::DirectX-Headers
 )
 
 install(TARGETS Stealthometer
