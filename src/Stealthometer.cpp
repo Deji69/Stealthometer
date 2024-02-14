@@ -660,6 +660,9 @@ auto Stealthometer::SetupEvents() -> void {
 	events.listen<Events::ContractStart>([this](auto& ev) {
 		this->NewContract();
 	});
+	events.listen<Events::ContractLoad>([this](auto& ev) {
+		this->NewContract();
+	});
 	events.listen<Events::ContractEnd>([this](const ServerEvent<Events::ContractEnd>& ev) {
 		if (this->IsContractEnded()) return;
 		this->missionEndTime = ev.Timestamp;

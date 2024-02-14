@@ -256,6 +256,13 @@ struct Event<Events::ContractStart> {
 };
 
 template<>
+struct Event<Events::ContractLoad>
+{
+	static auto constexpr Name = "ContractLoad";
+	using EventValue = VoidEventValue;
+};
+
+template<>
 struct Event<Events::ContractEnd> {
 	static auto constexpr Name = "ContractEnd";
 	using EventValue = VoidEventValue;

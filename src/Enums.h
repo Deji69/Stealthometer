@@ -34,6 +34,7 @@ enum class Events {
 	BodyHidden,
 	BrokenDisguiseCleared,
 	ContractStart,
+	ContractLoad,
 	ContractEnd,
 	CrowdNPC_Died,
 	Dart_Hit,
