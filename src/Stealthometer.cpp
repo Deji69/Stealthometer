@@ -788,7 +788,16 @@ auto Stealthometer::SetupEvents() -> void {
 		++stats.misc.agilityActions;
 	});
 	events.listen<Events::HoldingIllegalWeapon>([this](const ServerEvent<Events::HoldingIllegalWeapon>& ev) {
-		// TODO: Accumulate weapon holding time for play style?
+		if (this->IsContractEnded()) return;
+
+		if (stats.current.holdingIllegalWeapon != ev.Value.IsHoldingIllegalWeapon) {
+			stats.weaponHoldingStartTime = ev.Timestamp;
+			++stats.misc.timesTrespassed;
+		} else {
+			stats.misc.weaponHoldingTime += ev.Timestamp - stats.weaponHoldingStartTime;
+		}
+
+		stats.current.holdingIllegalWeapon = ev.Value.IsHoldingIllegalWeapon;
 	});
 	// TODO: The game can send 0'd repository IDs for dead bodies in certain situations.
 	// This makes it difficult to uniquely identify bodies to keep count of bodies found.

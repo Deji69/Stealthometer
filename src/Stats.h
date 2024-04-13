@@ -219,6 +219,7 @@ struct MiscStats
 	int targetsMadeSick = 0;
 	int timesTrespassed = 0;
 	double trespassTime = 0;
+	double weaponHoldingTime = 0;
 };
 
 struct CurrentStats
@@ -227,6 +228,7 @@ struct CurrentStats
 	bool inSuit = false;
 	bool trespassing = false;
 	bool disguiseBlown = false;
+	bool holdingIllegalWeapon = false;
 };
 
 struct Stats
@@ -245,6 +247,7 @@ struct Stats
 
 	double trespassStartTime = 0;
 	double currentTrespassTime = 0;
+	double weaponHoldingStartTime = 0;
 	std::vector<WitnessEvent> witnessEvents;
 	std::set<std::string, InsensitiveCompareLexicographic> witnesses;
 	std::set<std::string, InsensitiveCompareLexicographic> spottedBy;
