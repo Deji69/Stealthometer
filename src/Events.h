@@ -661,3 +661,31 @@ struct Event<Events::OpportunityEvents> {
 		std::string Event;
 	};
 };
+
+/// <summary>
+/// Freelancer
+/// </summary>
+
+template<>
+struct Event<Events::EvergreenCampaignActivated> {
+	static auto constexpr Name = "EvergreenCampaignActivated";
+	using EventValue = VoidEventValue;
+};
+
+template<>
+struct Event<Events::CampaignInProgress> {
+	static auto constexpr Name = "CampaignInProgress";
+	using EventValue = VoidEventValue;
+};
+
+template<>
+struct Event<Events::NoCampaignActive> {
+	static auto constexpr Name = "NoCampaignActive";
+	using EventValue = VoidEventValue;
+};
+
+template<>
+struct Event<Events::ScoringScreenEndState_CampaignCompleted> {
+	static auto constexpr Name = "ScoringScreenEndState_CampaignCompleted";
+	using EventValue = VoidEventValue;
+};

@@ -33,6 +33,7 @@ enum class Events {
 	BodyFound,
 	BodyHidden,
 	BrokenDisguiseCleared,
+	CampaignInProgress, // Indicates a Freelancer campaign is in progress
 	ContractStart,
 	ContractLoad,
 	ContractEnd,
@@ -43,6 +44,7 @@ enum class Events {
 	DisguiseBlown,
 	Door_Unlocked,
 	Drain_Pipe_Climbed,
+	EvergreenCampaignActivated, // Started Freelancer campaign/syndicate (fired on picking a syndicate at any stage of campaign)
 	ExitGate,
 	FirstMissedShot,
 	FirstNonHeadshot,
@@ -55,10 +57,12 @@ enum class Events {
 	ItemThrown,
 	Kill,
 	MurderedBodySeen,
+	NoCampaignActive, // Freelancer syndicate aborted (NOTE: fired at the end of a syndicate, and CampaignInProgress may be fired alongside it to indicate more syndicates await)
 	Noticed_Pacified,
 	NoticedKill,
 	OpportunityEvents,
 	Pacify,
+	ScoringScreenEndState_CampaignCompleted, // Freelancer campaign completed (??)
 	SecuritySystemRecorder,
 	setpieces,
 	ShotsFired,
