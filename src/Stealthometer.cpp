@@ -17,6 +17,8 @@
 #include <Glacier/ZScene.h>
 #include <IconsMaterialDesign.h>
 #include <cmrc/cmrc.hpp>
+#include <imgui.h>
+#include "deps/imgui/imgui_stdlib.h"
 
 #include "Stealthometer.h"
 #include "Enums.h"
@@ -25,6 +27,8 @@
 #include "Stats.h"
 #include "json.hpp"
 #include "FixMinMax.h"
+
+#pragma comment(lib, "Ws2_32.lib")
 
 CMRC_DECLARE(stealthometer);
 
@@ -45,13 +49,12 @@ auto APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) -> BOOL {
 	return TRUE;
 }
 
-Stealthometer::Stealthometer() : window(this->displayStats), randomGenerator(std::random_device{}()) {
+Stealthometer::Stealthometer() : window(this->displayStats), randomGenerator(std::random_device{}()), config(*this), liveSplitClient(config.Get()) {
 	this->SetupEvents();
 }
 
 Stealthometer::~Stealthometer() {
-	const ZMemberDelegate<Stealthometer, void(const SGameUpdateEvent&)> frameUpdateDelegate(this, &Stealthometer::OnFrameUpdate);
-	Globals::GameLoopManager->UnregisterFrameUpdate(frameUpdateDelegate, 1, EUpdateMode::eUpdatePlayMode);
+	this->UninstallHooks();
 }
 
 auto Stealthometer::Init() -> void
@@ -76,16 +79,49 @@ auto Stealthometer::Init() -> void
 		}
 		else Logger::Error("Stealthometer: repo.json invalid.");
 	}
+	//this->window.create(hInstance);
+}
 
+auto Stealthometer::InstallHooks() -> void {
+	if (this->hooksInstalled) return;
+
+	const ZMemberDelegate<Stealthometer, void(const SGameUpdateEvent&)> frameUpdateDelegatePlayMode(this, &Stealthometer::OnFrameUpdatePlayMode);
+	Globals::GameLoopManager->RegisterFrameUpdate(frameUpdateDelegatePlayMode, 1, EUpdateMode::eUpdatePlayMode);
+
+	const ZMemberDelegate<Stealthometer, void(const SGameUpdateEvent&)> frameUpdateDelegateAlways(this, &Stealthometer::OnFrameUpdateAlways);
+	Globals::GameLoopManager->RegisterFrameUpdate(frameUpdateDelegateAlways, 0, EUpdateMode::eUpdateAlways);
+
+	Hooks::ZLoadingScreenVideo_ActivateLoadingScreen->AddDetour(this, &Stealthometer::OnLoadingScreenActivated);
 	Hooks::ZAchievementManagerSimple_OnEventSent->AddDetour(this, &Stealthometer::ZAchievementManagerSimple_OnEventSent);
-	this->window.create(hInstance);
+
+	this->hooksInstalled = true;
+}
+
+auto Stealthometer::UninstallHooks() -> void {
+	if (!this->hooksInstalled) return;
+
+	const ZMemberDelegate<Stealthometer, void(const SGameUpdateEvent&)> frameUpdateDelegatePlayMode(this, &Stealthometer::OnFrameUpdatePlayMode);
+	Globals::GameLoopManager->UnregisterFrameUpdate(frameUpdateDelegatePlayMode, 1, EUpdateMode::eUpdatePlayMode);
+
+	const ZMemberDelegate<Stealthometer, void(const SGameUpdateEvent&)> frameUpdateDelegateAlways(this, &Stealthometer::OnFrameUpdateAlways);
+	Globals::GameLoopManager->UnregisterFrameUpdate(frameUpdateDelegateAlways, 0, EUpdateMode::eUpdateAlways);
+
+	Hooks::ZLoadingScreenVideo_ActivateLoadingScreen->RemoveDetour(&Stealthometer::OnLoadingScreenActivated);
+	Hooks::ZAchievementManagerSimple_OnEventSent->RemoveDetour(&Stealthometer::ZAchievementManagerSimple_OnEventSent);
+
+	this->hooksInstalled = false;
 }
 
 auto Stealthometer::OnEngineInitialized() -> void
 {
-	const ZMemberDelegate<Stealthometer, void(const SGameUpdateEvent&)> frameUpdateDelegate(this, &Stealthometer::OnFrameUpdate);
-	Globals::GameLoopManager->RegisterFrameUpdate(frameUpdateDelegate, 1, EUpdateMode::eUpdatePlayMode);
-	this->window.create(hInstance);
+	config.Load();
+	this->InstallHooks();
+
+	if (config.Get().externalWindow)
+		this->window.create(hInstance);
+
+	if (config.Get().liveSplitEnabled)
+		this->liveSplitClient.start();
 }
 
 auto Stealthometer::IsRepoIdTargetNPC(const std::string& id) const -> bool {
@@ -107,7 +143,11 @@ auto Stealthometer::GetRepoEntry(const std::string& id) -> const nlohmann::json*
 	return nullptr;
 }
 
-auto Stealthometer::OnFrameUpdate(const SGameUpdateEvent& ev) -> void {
+auto Stealthometer::OnFrameUpdateAlways(const SGameUpdateEvent& ev) -> void {
+	this->ProcessLoadRemoval();
+}
+
+auto Stealthometer::OnFrameUpdatePlayMode(const SGameUpdateEvent& ev) -> void {
 	for (int i = 0; i < *Globals::NextActorId; ++i) {
 		const auto& actor = Globals::ActorManager->m_aActiveActors[i];
 		const auto actorSpatial = actor.m_ref.QueryInterface<ZSpatialEntity>();
@@ -157,6 +197,54 @@ auto Stealthometer::OnFrameUpdate(const SGameUpdateEvent& ev) -> void {
 	}
 }
 
+auto Stealthometer::ProcessLoadRemoval() -> void {
+	class ZRenderManager {
+	public:
+		virtual ~ZRenderManager() = default;
+		virtual bool ZRenderManager_unk1() = 0;
+		virtual bool ZRenderManager_unk2() = 0;
+		virtual bool ZRenderManager_unk3() = 0;
+		virtual bool ZRenderManager_unk4() = 0; //
+		virtual bool ZRenderManager_unk5() = 0; // gracefully freezes the game??
+		virtual bool IsLoadingScreenActive() = 0;
+
+	public:
+		PAD(0x14178);
+		ZRenderDevice* m_pDevice; // 0x14180, look for ZRenderDevice constructor
+		PAD(0xF8); // 0x14188
+		ZRenderContext* m_pRenderContext; // 0x14280, look for "ZRenderManager::RenderThread" string, first thing being constructed and assigned
+	};
+
+	static_assert(offsetof(ZRenderManager, m_pDevice) == 0x14180);
+	static_assert(offsetof(ZRenderManager, m_pRenderContext) == 0x14280);
+
+	auto ptr = Globals::RenderManager;
+	auto renderManager = reinterpret_cast<ZRenderManager*>(Globals::RenderManager);
+	if (!renderManager) return;
+
+	auto isLoadingScreenActive = renderManager->IsLoadingScreenActive();
+
+	if ((isLoadingScreenActive || loadingScreenActivated) && !loadRemovalActive) {
+		liveSplitClient.pause();
+		loadRemovalActive = true;
+	}
+
+	if (isLoadingScreenActive)
+		isLoadingScreenCheckHasBeenTrue = true;
+	else if (isLoadingScreenCheckHasBeenTrue) {
+		loadingScreenActivated = false;
+		isLoadingScreenCheckHasBeenTrue = false;
+
+		if (loadRemovalActive) {
+			if (this->runData.shouldAutoStartLiveSplit) {
+				liveSplitClient.send(this->startAfterLoad ? eClientMessage::StartTimer : eClientMessage::Resume);
+				this->startAfterLoad = false;
+			}
+			loadRemovalActive = false;
+		}
+	}
+}
+
 auto Stealthometer::OnDrawMenu() -> void {
 	if (ImGui::Button(ICON_MD_PIE_CHART " STEALTHOMETER"))
 		this->statVisibleUI = !this->statVisibleUI;
@@ -169,21 +257,96 @@ auto Stealthometer::DrawSettingsUI(bool focused) -> void {
 
 	if (ImGui::Begin(ICON_MD_SETTINGS " STEALTHOMETER", &this->statVisibleUI, ImGuiWindowFlags_AlwaysAutoResize)) {
 		ImGui::PushFont(SDK()->GetImGuiRegularFont());
+		auto& cfg = config.Get();
 
-		if (ImGui::Checkbox("External Window", &this->externalWindowEnabled)) {
-			if (this->externalWindowEnabled) this->window.create(hInstance);
+		if (ImGui::Checkbox("External Window", &cfg.externalWindow)) {
+			if (cfg.externalWindow) this->window.create(hInstance);
 			else this->window.destroy();
+			config.Save();
 		}
-		if (ImGui::Checkbox("External Window Dark Mode", &this->externalWindowDarkMode))
-			this->window.setDarkMode(this->externalWindowDarkMode);
+		if (ImGui::Checkbox("External Window Dark Mode", &cfg.externalWindowDark)) {
+			this->window.setDarkMode(cfg.externalWindowDark);
+			config.Save();
+		}
 
-		if (ImGui::Checkbox("External Window On Top", &this->externalWindowOnTop))
-			this->window.setAlwaysOnTop(this->externalWindowOnTop);
+		if (ImGui::Checkbox("External Window On Top", &cfg.externalWindowOnTop)) {
+			this->window.setAlwaysOnTop(cfg.externalWindowOnTop);
+			config.Save();
+		}
+
+		if (ImGui::Button("LiveSplit")) this->liveSplitWindowOpen = true;
 
 		if (ImGui::Button("Kill Stats")) this->killsWindowOpen = true;
 		ImGui::SameLine();
 		if (ImGui::Button("KO Stats")) this->pacifiesWindowOpen = true;
 		if (ImGui::Button("Misc Stats")) this->miscWindowOpen = true;
+
+		ImGui::PopFont();
+	}
+
+	ImGui::End();
+	ImGui::PopFont();
+}
+
+auto Stealthometer::DrawLiveSplitUI(bool focused) -> void
+{
+	if (!this->liveSplitWindowOpen) return;
+	if (!focused) return;
+
+	auto& cfg = config.Get();
+
+	ImGui::PushFont(SDK()->GetImGuiBlackFont());
+
+	ImGui::SetNextWindowSizeConstraints(ImVec2{450, 400}, ImVec2{600, -1});
+	if (ImGui::Begin(ICON_MD_TIMER " LIVESPLIT", &this->liveSplitWindowOpen)) {
+		ImGui::PushFont(SDK()->GetImGuiRegularFont());
+
+		auto connected = liveSplitClient.isConnected();
+		ImGui::PushStyleColor(ImGuiCol_Text, connected ? IM_COL32(0, 255, 0, 255) : IM_COL32(255, 0, 0, 255));
+		ImGui::TextUnformatted(connected ? "Connected" : "Disconnected");
+		ImGui::PopStyleColor();
+
+		if (ImGui::Checkbox("Enable", &cfg.liveSplitEnabled)) {
+			config.Save();
+
+			if (!cfg.liveSplitEnabled && liveSplitClient.isStarted())
+				liveSplitClient.stop();
+			else if (cfg.liveSplitEnabled && !liveSplitClient.isStarted())
+				liveSplitClient.start();
+		}
+		if (ImGui::InputText("IP", &cfg.liveSplitIP)) {
+			auto res = cfg.liveSplitIP.empty() ? INADDR_NONE : inet_addr(cfg.liveSplitIP.c_str());
+			if (res == INADDR_NONE)
+				cfg.liveSplitIP = "127.0.0.1";
+			config.Save();
+		}
+		static std::string portInput;
+		portInput = std::format("{}", cfg.liveSplitPort);
+		if (ImGui::InputText("Port", &portInput)) {
+			if (portInput.size() > 5) portInput.clear();
+			uint16_t port = 16834;
+			auto res = !portInput.empty() ? std::from_chars(portInput.c_str(), portInput.c_str() + portInput.size(), port).ec : std::errc{};
+			if (res != std::errc{})
+				port = 16834;
+			cfg.liveSplitPort = port;
+			config.Save();
+		}
+
+		if (cfg.liveSplitEnabled && connected) {
+			if (ImGui::Button("Reset")) {
+				liveSplitClient.send(eClientMessage::Reset);
+				this->runData.shouldAutoStartLiveSplit = false;
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Split"))
+				liveSplitClient.send(eClientMessage::Split);
+			ImGui::SameLine();
+			if (ImGui::Button("Unsplit"))
+				liveSplitClient.send(eClientMessage::Unsplit);
+			ImGui::SameLine();
+			if (ImGui::Button("Pause/Resume"))
+				liveSplitClient.send(eClientMessage::Pause);
+		}
 
 		ImGui::PopFont();
 	}
@@ -317,6 +480,7 @@ auto Stealthometer::DrawExpandedStatsUI(bool focused) -> void {
 
 auto Stealthometer::OnDrawUI(bool focused) -> void {
 	this->DrawExpandedStatsUI(focused);
+	this->DrawLiveSplitUI(focused);
 
 	if (!this->statVisibleUI) return;
 
@@ -625,8 +789,9 @@ auto Stealthometer::SetupEvents() -> void {
 
 		// If already found, just keep track of target vs. non-target sightings.
 		if (bodyAlreadyFound) {
-			if (ev.isWitnessTarget)
+			if (ev.isWitnessTarget) {
 				stats.targetBodyWitnesses.emplace(ev.witnessId);
+			}
 			else if (!foundMurderedInfoIt->second.isSightedByNonTarget) {
 				foundMurderedInfoIt->second.isSightedByNonTarget = true;
 				++stats.bodies.foundMurderedByNonTarget;
@@ -657,7 +822,33 @@ auto Stealthometer::SetupEvents() -> void {
 		bodyFoundInfo.isSightedByNonTarget = !ev.isWitnessTarget;
 		stats.bodies.foundMurderedInfos.try_emplace(ev.bodyId, std::move(bodyFoundInfo));
 	};
-	events.listen<Events::ContractStart>([this](auto& ev) {
+	events.listen<Events::EvergreenCampaignActivated>([this](const ServerEvent<Events::EvergreenCampaignActivated>& ev) {
+		if (!this->freelancer.campaignInProgress)
+			this->liveSplitClient.send(eClientMessage::Reset);
+
+		this->liveSplitClient.send(eClientMessage::StartOrSplit);
+
+		this->freelancer.campaignCompleted = false;
+	});
+	events.listen<Events::ScoringScreenEndState_CampaignCompleted>([this](const ServerEvent<Events::ScoringScreenEndState_CampaignCompleted>& ev) {
+		this->liveSplitClient.send(eClientMessage::Split);
+		this->runData.freelancer.campaignCompleted = true;
+		this->runData.freelancer.campaignInProgress = false;
+	});
+	events.listen<Events::NoCampaignActive>([this](const ServerEvent<Events::NoCampaignActive>& ev) {
+		this->runData.freelancer.campaignInProgress = false;
+		this->runData.freelancer.noSyndicateActive = true;
+	});
+	events.listen<Events::CampaignInProgress>([this](const ServerEvent<Events::CampaignInProgress>& ev) {
+		this->runData.freelancer.campaignInProgress = true;
+	});
+	events.listen<Events::ContractStart>([this](const ServerEvent<Events::ContractStart>& ev) {
+		this->runData.missionType = ev.Value.ContractType;
+		this->runData.shouldAutoStartLiveSplit = true;
+		this->startAfterLoad = this->loadRemovalActive;
+		if (!this->loadRemovalActive)
+			this->liveSplitClient.send(eClientMessage::StartTimer);
+		Logger::Info("ContractStart: {}", ev.json.dump());
 		this->NewContract();
 	});
 	events.listen<Events::ContractLoad>([this](auto& ev) {
@@ -668,6 +859,13 @@ auto Stealthometer::SetupEvents() -> void {
 		this->missionEndTime = ev.Timestamp;
 	});
 	events.listen<Events::ExitGate>([this](const ServerEvent<Events::ExitGate>& ev) {
+		if (this->runData.missionType != MissionType::Evergreen) {
+			this->liveSplitClient.pause();
+			this->liveSplitClient.send(eClientMessage::SetGameTime, {std::to_string(ev.Timestamp)});
+			this->liveSplitClient.send(eClientMessage::Split);
+			this->runData.shouldAutoStartLiveSplit = false;
+		}
+
 		this->missionEndTime = ev.Timestamp;
 	});
 	events.listen<Events::IntroCutEnd>([this](const ServerEvent<Events::IntroCutEnd>& ev) {
@@ -897,10 +1095,16 @@ auto Stealthometer::SetupEvents() -> void {
 			if (!stats.spottedBy.contains(name)) {
 				Logger::Info("Stealthometer: spotted by {} - Target: {}", name, isTarget);
 
-				if (isTarget) stats.targetsSpottedBy.insert(name);
-
 				++stats.detection.spotted;
 				stats.spottedBy.insert(name);
+
+				if (isTarget) {
+					// It's possible for the spotted event to fire right AFTER the target died. Handle this dumb edge case.
+					if (stats.kills.targets.contains(name)) continue;
+
+					stats.targetsSpottedBy.insert(name);
+				}
+
 				stats.detection.nonTargetsSpottedBy = static_cast<int>(stats.spottedBy.size()) - stats.targetsSpottedBy.size();
 			}
 		}
@@ -909,6 +1113,9 @@ auto Stealthometer::SetupEvents() -> void {
 		if (this->IsContractEnded()) return;
 
 		for (const auto& name : ev.Value.value) {
+			// It's possible for the witnesses event to fire right AFTER the NPC died. Handle this dumb edge case.
+			if (stats.kills.targets.contains(name) || stats.kills.nonTargets.contains(name)) continue;
+
 			stats.witnesses.insert(name);
 		}
 	});
@@ -1234,6 +1441,15 @@ auto Stealthometer::SetupEvents() -> void {
 	});
 	//eventName == "ItemDestroyed" // broken camcorder
 	//eventName == "TargetEscapeFoiled" // Yuki killed in Gondola
+}
+
+DEFINE_PLUGIN_DETOUR(Stealthometer, void*, OnLoadingScreenActivated, void* th, void* a1) {
+	loadingScreenActivated = true;
+	if (!loadRemovalActive) {
+		liveSplitClient.pause();
+		loadRemovalActive = true;
+	}
+	return HookResult<void*>(HookAction::Continue());
 }
 
 DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent, ZAchievementManagerSimple* th, uint32_t eventId, const ZDynamicObject& ev) {

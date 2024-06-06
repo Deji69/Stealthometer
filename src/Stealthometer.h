@@ -7,7 +7,10 @@
 #include <Glacier/ZEntity.h>
 #include <Glacier/ZInput.h>
 #include "json.hpp"
+#include "Config.h"
 #include "Events.h"
+#include "LiveSplitClient.h"
+#include "RunData.h"
 #include "Stats.h"
 #include "StatWindow.h"
 #include "util.h"
@@ -31,17 +34,23 @@ public:
 	auto OnEngineInitialized() -> void override;
 	auto OnDrawUI(bool hasFocus) -> void override;
 	auto OnDrawMenu() -> void override;
-	auto OnFrameUpdate(const SGameUpdateEvent&) -> void;
+	auto OnFrameUpdateAlways(const SGameUpdateEvent&) -> void;
+	auto OnFrameUpdatePlayMode(const SGameUpdateEvent&) -> void;
 
 	auto NewContract() -> void;
 	auto UpdateDisplayStats() -> void;
 	auto CalculateStealthRating() -> double;
 	auto GetSilentAssassinStatus() const -> SilentAssassinStatus;
+	auto ProcessLoadRemoval() -> void;
+
+	auto InstallHooks() -> void;
+	auto UninstallHooks() -> void;
 
 private:
 	auto SetupEvents() -> void;
 	auto DrawSettingsUI(bool focused) -> void;
 	auto DrawExpandedStatsUI(bool focused) -> void;
+	auto DrawLiveSplitUI(bool focused) -> void;
 	auto IsContractEnded() const -> bool;
 	auto IsRepoIdTargetNPC(const std::string& id) const -> bool;
 	auto GetRepoEntry(const std::string& id) -> const nlohmann::json*;
@@ -53,6 +62,7 @@ private:
 private:
 	//DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZGameStatsManager_SendAISignals, ZGameStatsManager* th);
 	DECLARE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent, ZAchievementManagerSimple* th, uint32_t eventIndex, const ZDynamicObject& ev);
+	DECLARE_PLUGIN_DETOUR(Stealthometer, void*, OnLoadingScreenActivated, void* th, void* a1);
 
 private:
 	SRWLOCK eventLock = {};
@@ -60,23 +70,36 @@ private:
 	DisplayStats displayStats;
 	StatWindow window;
 	EventSystem events;
+	Config config;
+	LiveSplitClient liveSplitClient;
 	std::unordered_set<std::string, StringHashLowercase, InsensitiveCompare> freelanceTargets;
 	std::array<ActorData, 1000> actorData;
 	std::vector<std::string> eventHistory;
 	std::mt19937 randomGenerator;
 	std::unordered_map<std::string, nlohmann::json, StringHashLowercase, InsensitiveCompare> repo;
+
+	RunData runData;
+	FreelancerRunData freelancer;
+
 	int npcCount = 0;
 	double cutsceneEndTime = 0;
 	double missionEndTime = 0;
 	double lastEventTimestamp = 0;
+	bool hooksInstalled = false;
 	bool statVisibleUI = false;
 	bool externalWindowEnabled = true;
 	bool externalWindowDarkMode = true;
 	bool externalWindowOnTop = false;
 	bool showAllStats = false;
+	bool liveSplitWindowOpen = false;
 	bool killsWindowOpen = false;
 	bool pacifiesWindowOpen = false;
 	bool miscWindowOpen = false;
+
+	bool loadRemovalActive = false;
+	bool isLoadingScreenCheckHasBeenTrue = false;
+	bool loadingScreenActivated = false;
+	bool startAfterLoad = false;
 };
 
 DEFINE_ZHM_PLUGIN(Stealthometer)

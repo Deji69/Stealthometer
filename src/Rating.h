@@ -39,6 +39,30 @@ enum class RatingEventType
  * Or, like, we'll just work it out as we go...
  */
 inline const auto playStyleRatings = std::array{
+	PlayStyleRating("Assassin", [](const Stats& stats) {
+		return static_cast<int>(stats.kills.targets.size() * 500);
+	}),
+	PlayStyleRating("Ghost", [](const Stats& stats) {
+		if (stats.detection.spotted || stats.detection.onCamera || stats.misc.recordedThenErased) return 0;
+		if (!stats.misc.timesTrespassed || stats.detection.caughtTrespassing) return 0;
+		if (stats.pacifies.total + stats.kills.total == 0) return 0;
+		if (stats.kills.noticed || stats.pacifies.noticed || stats.bodies.found) return 0;
+		return 600 + static_cast<int>(stats.kills.targets.size() * 400);
+	}),
+	PlayStyleRating("Shadow", [](const Stats& stats) {
+		if (stats.witnesses.size() || stats.detection.onCamera) return 0;
+		if (!stats.misc.timesTrespassed) return 0;
+		if (stats.pacifies.total + stats.kills.total == 0) return 0;
+		if (stats.kills.noticed || stats.pacifies.noticed) return 0;
+		return 600 + static_cast<int>(stats.kills.targets.size() * 400);
+	}),
+	PlayStyleRating("Phantom", [](const Stats& stats) {
+		if (stats.witnesses.size()) return 0;
+		if (!stats.misc.timesTrespassed) return 0;
+		if (stats.pacifies.total + stats.kills.total == 0) return 0;
+		return 600 + static_cast<int>(stats.kills.targets.size() * 400);
+	}),
+
 	PlayStyleRating("Reckless", [](const Stats& stats) {
 		return static_cast<int>(stats.disguisesBlown.size()) * 50
 			+ static_cast<int>(stats.kills.nonTargets.size()) * 30
@@ -56,8 +80,8 @@ inline const auto playStyleRatings = std::array{
 		if (stats.disguisesBlown.size()) return 0;
 		return stats.misc.disguisesTaken * 250;
 	}),
-	PlayStyleRating("Boxer", [](const Stats& stats) {
-		return stats.misc.closeCombatEngagements * 350;
+	PlayStyleRating("Assailant", [](const Stats& stats) {
+		return stats.misc.closeCombatEngagements * 200;
 	}),
 	PlayStyleRating("Criminal", [](const Stats& stats) {
 		if (!stats.tension.arrest && !stats.tension.combat && !stats.tension.alertedHigh) return 0;
@@ -87,6 +111,8 @@ inline const auto playStyleRatings = std::array{
 			+ stats.misc.timesTrespassed * 25;
 	}),
 	PlayStyleRating("Spy", [](const Stats& stats) {
+		if (stats.detection.spotted) return 0;
+		if (stats.kills.nonTargets.size()) return 0;
 		int count = 0;
 		for (auto const& item : stats.itemsObtained) {
 			switch (item.second.type) {
@@ -96,7 +122,7 @@ inline const auto playStyleRatings = std::array{
 			default: break;
 			}
 		}
-		return count * 200;
+		return count * 200 + stats.misc.recorderErased * 100;;
 	}),
 	PlayStyleRating("Hoarder", [](const Stats& stats) {
 		int count = 0;
@@ -114,7 +140,7 @@ inline const auto playStyleRatings = std::array{
 			}
 		}
 		if (count < 5) return 0;
-		return count * 50;
+		return count * 25;
 	}),
 	PlayStyleRating("Thief", [](const Stats& stats) {
 		int count = 0;
@@ -130,10 +156,10 @@ inline const auto playStyleRatings = std::array{
 			}
 		}
 		if (!count) return 0;
-		return count * 50 + stats.misc.doorsUnlocked * 20;
+		return count * 25 + stats.misc.doorsUnlocked * 20;
 	}),
 	PlayStyleRating("Litterer", [](const Stats& stats) {
-		return static_cast<int>(stats.itemsDisposed.size() - stats.itemsObtained.size()) * 40;
+		return static_cast<int>(stats.itemsDisposed.size() - stats.itemsObtained.size()) * 30;
 	}),
 	PlayStyleRating("Cleaner", [](const Stats& stats) {
 		return stats.bodies.hidden * 150 - (stats.kills.total + stats.pacifies.total) * 50
@@ -163,7 +189,6 @@ inline const auto playStyleRatings = std::array{
 		return stats.pacifies.unnoticed * 100;
 	}),
 	PlayStyleRating("Vandal", [](const Stats& stats) {
-		// TODO: add setpiece/object destruction
 		auto pts = stats.misc.camerasDestroyed * 100;
 		pts += stats.misc.setpiecesDestroyed * 200;
 		pts += stats.misc.objectsDestroyed * 150;
