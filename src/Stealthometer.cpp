@@ -28,6 +28,8 @@
 #include "json.hpp"
 #include "FixMinMax.h"
 
+using namespace std::string_literals;
+
 #pragma comment(lib, "Ws2_32.lib")
 
 CMRC_DECLARE(stealthometer);
@@ -274,16 +276,101 @@ auto Stealthometer::DrawSettingsUI(bool focused) -> void {
 			config.Save();
 		}
 
+		if (ImGui::Button("Overlay")) {
+			cfg.inGameOverlay = true;
+			config.Save();
+		}
+		ImGui::SameLine();
+		if (ImGui::Checkbox("Detailed", &cfg.inGameOverlayDetailed)) {
+			if (cfg.inGameOverlayDetailed) this->window.create(hInstance);
+			else this->window.destroy();
+			config.Save();
+		}
+
 		if (ImGui::Button("LiveSplit")) this->liveSplitWindowOpen = true;
 
 		if (ImGui::Button("Kill Stats")) this->killsWindowOpen = true;
 		ImGui::SameLine();
 		if (ImGui::Button("KO Stats")) this->pacifiesWindowOpen = true;
+		ImGui::SameLine();
 		if (ImGui::Button("Misc Stats")) this->miscWindowOpen = true;
 
 		ImGui::PopFont();
 	}
 
+	ImGui::End();
+	ImGui::PopFont();
+}
+
+auto Stealthometer::DrawOverlayUI(bool focused) -> void
+{
+	auto& cfg = config.Get();
+	if (!cfg.inGameOverlay) return;
+
+	auto viewportSize = ImGui::GetMainViewport()->Size;
+	auto flags = static_cast<ImGuiWindowFlags>(ImGuiWindowFlags_AlwaysAutoResize);
+
+	if (cfg.overlayDockMode != DockMode::None || !focused)
+		flags |= ImGuiWindowFlags_NoTitleBar;
+
+	switch (cfg.overlayDockMode) {
+		case DockMode::TopLeft:
+			ImGui::SetNextWindowPos({0, 0});
+			break;
+		case DockMode::TopRight:
+			ImGui::SetNextWindowPos({viewportSize.x - this->overlaySize.x, 0});
+			break;
+		case DockMode::BottomLeft:
+			ImGui::SetNextWindowPos({0, viewportSize.y - this->overlaySize.y});
+			break;
+		case DockMode::BottomRight:
+			ImGui::SetNextWindowPos({viewportSize.x - this->overlaySize.x, viewportSize.y - this->overlaySize.y});
+			break;
+	}
+
+	ImGui::PushFont(SDK()->GetImGuiBlackFont());
+	if (ImGui::Begin(ICON_MD_PIE_CHART " STATUS", &cfg.inGameOverlay, flags)) {
+		this->overlaySize = ImGui::GetWindowSize();
+
+		ImGui::PushFont(SDK()->GetImGuiBoldFont());
+
+		if (this->displayStats.silentAssassin == SilentAssassinStatus::OK) {
+			ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 255, 0, 255));
+			ImGui::Text("Silent Assassin");
+			ImGui::PopStyleColor();
+		}
+		else if (this->displayStats.silentAssassin == SilentAssassinStatus::RedeemableCamera) {
+			ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(217, 109, 0, 255));
+			ImGui::Text("Cams");
+			ImGui::PopStyleColor();
+		}
+		else if (this->displayStats.silentAssassin == SilentAssassinStatus::RedeemableTarget) {
+			ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(217, 109, 0, 255));
+			ImGui::Text("Target");
+			ImGui::PopStyleColor();
+		}
+		else if (this->displayStats.silentAssassin == SilentAssassinStatus::RedeemableCameraAndTarget) {
+			ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(217, 109, 0, 255));
+			ImGui::Text("Cams | Target");
+			ImGui::PopStyleColor();
+		}
+		else {
+			std::string str;
+
+			if (this->displayStats.spotted > 0)
+				str += "Spotted";
+			if (this->displayStats.bodiesFound > 0)
+				str += (str.empty() ? ""s : " | "s) + "Body Found"s;
+			if (this->displayStats.civilianKills > 0 || this->displayStats.guardKills > 0)
+				str += (str.empty() ? ""s : " | "s) + "Non-Target Kill"s;
+
+			ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
+			ImGui::Text(str.c_str());
+			ImGui::PopStyleColor();
+		}
+
+		ImGui::PopFont();
+	}
 	ImGui::End();
 	ImGui::PopFont();
 }
@@ -481,6 +568,7 @@ auto Stealthometer::DrawExpandedStatsUI(bool focused) -> void {
 auto Stealthometer::OnDrawUI(bool focused) -> void {
 	this->DrawExpandedStatsUI(focused);
 	this->DrawLiveSplitUI(focused);
+	this->DrawOverlayUI(focused);
 
 	if (!this->statVisibleUI) return;
 

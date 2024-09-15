@@ -51,6 +51,7 @@ private:
 	auto DrawSettingsUI(bool focused) -> void;
 	auto DrawExpandedStatsUI(bool focused) -> void;
 	auto DrawLiveSplitUI(bool focused) -> void;
+	auto DrawOverlayUI(bool focused) -> void;
 	auto IsContractEnded() const -> bool;
 	auto IsRepoIdTargetNPC(const std::string& id) const -> bool;
 	auto GetRepoEntry(const std::string& id) -> const nlohmann::json*;
@@ -92,9 +93,11 @@ private:
 	bool externalWindowOnTop = false;
 	bool showAllStats = false;
 	bool liveSplitWindowOpen = false;
+	bool inGameOverlayOpen = false;
 	bool killsWindowOpen = false;
 	bool pacifiesWindowOpen = false;
 	bool miscWindowOpen = false;
+	ImVec2 overlaySize = {};
 
 	bool loadRemovalActive = false;
 	bool isLoadingScreenCheckHasBeenTrue = false;
