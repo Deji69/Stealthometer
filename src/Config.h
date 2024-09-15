@@ -39,6 +39,14 @@ public:
 		data.liveSplitEnabled = plugin.GetSettingBool("livesplit", "enabled", data.liveSplitEnabled);
 		data.liveSplitIP = plugin.GetSetting("livesplit", "ip", data.liveSplitIP);
 		data.liveSplitPort = plugin.GetSettingInt("livesplit", "port", data.liveSplitPort);
+
+		auto overlayDock = plugin.GetSetting("general", "overlay_dock", "");
+
+		if (overlayDock == "topleft") data.overlayDockMode = DockMode::TopLeft;
+		else if (overlayDock == "topright") data.overlayDockMode = DockMode::TopRight;
+		else if (overlayDock == "bottomleft") data.overlayDockMode = DockMode::BottomLeft;
+		else if (overlayDock == "bottomright") data.overlayDockMode = DockMode::BottomRight;
+		else data.overlayDockMode = DockMode::None;
 	}
 
 	void Save() {
@@ -55,6 +63,23 @@ public:
 		plugin.SetSettingBool("livesplit", "enabled", data.liveSplitEnabled);
 		plugin.SetSetting("livesplit", "ip", data.liveSplitIP);
 		plugin.SetSettingInt("livesplit", "port", data.liveSplitPort);
+		
+		auto spinOverlayDock = "none";
+		switch (data.overlayDockMode) {
+		case DockMode::TopLeft:
+			spinOverlayDock = "topleft";
+			break;
+		case DockMode::TopRight:
+			spinOverlayDock = "topright";
+			break;
+		case DockMode::BottomLeft:
+			spinOverlayDock = "bottomleft";
+			break;
+		case DockMode::BottomRight:
+			spinOverlayDock = "bottomright";
+			break;
+		}
+		plugin.SetSetting("general", "overlay_dock", spinOverlayDock);
 	}
 
 	inline ConfigData& Get() { return data; }
