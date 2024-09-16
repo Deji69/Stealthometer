@@ -261,6 +261,64 @@ auto Stealthometer::DrawSettingsUI(bool focused) -> void {
 		ImGui::PushFont(SDK()->GetImGuiRegularFont());
 		auto& cfg = config.Get();
 
+		if (ImGui::Button("Overlay")) {
+			cfg.inGameOverlay = true;
+			config.Save();
+		}
+
+		ImGui::SameLine(100.0);
+
+		auto selectedOverlayDockName = "Undocked";
+
+		switch (cfg.overlayDockMode) {
+			case DockMode::TopLeft:
+				selectedOverlayDockName = "Top Left";
+				break;
+			case DockMode::TopRight:
+				selectedOverlayDockName = "Top Right";
+				break;
+			case DockMode::BottomLeft:
+				selectedOverlayDockName = "Bottom Left";
+				break;
+			case DockMode::BottomRight:
+				selectedOverlayDockName = "Bottom Right";
+				break;
+		}
+
+		if (ImGui::BeginCombo("##OverlayDock", selectedOverlayDockName, ImGuiComboFlags_HeightLarge)) {
+			if (ImGui::Selectable("Undocked", cfg.overlayDockMode == DockMode::None, 0)) {
+				cfg.overlayDockMode = DockMode::None;
+				this->config.Save();
+			}
+			if (cfg.overlayDockMode == DockMode::None) ImGui::SetItemDefaultFocus();
+
+			if (ImGui::Selectable("Top Left", cfg.overlayDockMode == DockMode::TopLeft, 0)) {
+				cfg.overlayDockMode = DockMode::TopLeft;
+				this->config.Save();
+			}
+			if (cfg.overlayDockMode == DockMode::TopLeft) ImGui::SetItemDefaultFocus();
+
+			if (ImGui::Selectable("Top Right", cfg.overlayDockMode == DockMode::TopRight, 0)) {
+				cfg.overlayDockMode = DockMode::TopRight;
+				this->config.Save();
+			}
+			if (cfg.overlayDockMode == DockMode::TopRight) ImGui::SetItemDefaultFocus();
+
+			if (ImGui::Selectable("Bottom Left", cfg.overlayDockMode == DockMode::BottomLeft, 0)) {
+				cfg.overlayDockMode = DockMode::BottomLeft;
+				this->config.Save();
+			}
+			if (cfg.overlayDockMode == DockMode::BottomLeft) ImGui::SetItemDefaultFocus();
+
+			if (ImGui::Selectable("Bottom Right", cfg.overlayDockMode == DockMode::BottomRight, 0)) {
+				cfg.overlayDockMode = DockMode::BottomRight;
+				this->config.Save();
+			}
+			if (cfg.overlayDockMode == DockMode::BottomRight) ImGui::SetItemDefaultFocus();
+
+			ImGui::EndCombo();
+		}
+
 		if (ImGui::Checkbox("External Window", &cfg.externalWindow)) {
 			if (cfg.externalWindow) this->window.create(hInstance);
 			else this->window.destroy();
@@ -273,17 +331,6 @@ auto Stealthometer::DrawSettingsUI(bool focused) -> void {
 
 		if (ImGui::Checkbox("External Window On Top", &cfg.externalWindowOnTop)) {
 			this->window.setAlwaysOnTop(cfg.externalWindowOnTop);
-			config.Save();
-		}
-
-		if (ImGui::Button("Overlay")) {
-			cfg.inGameOverlay = true;
-			config.Save();
-		}
-		ImGui::SameLine();
-		if (ImGui::Checkbox("Detailed", &cfg.inGameOverlayDetailed)) {
-			if (cfg.inGameOverlayDetailed) this->window.create(hInstance);
-			else this->window.destroy();
 			config.Save();
 		}
 
