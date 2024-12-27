@@ -19,6 +19,7 @@ struct ConfigData
 	bool inGameOverlay = false;
 	bool inGameOverlayDetailed = false;
 	DockMode overlayDockMode = DockMode::None;
+	bool overlayTransparency = true;
 	bool liveSplitEnabled = false;
 	std::string liveSplitIP = "127.0.0.1";
 	uint16_t liveSplitPort = 16834;
@@ -47,6 +48,8 @@ public:
 		else if (overlayDock == "bottomleft") data.overlayDockMode = DockMode::BottomLeft;
 		else if (overlayDock == "bottomright") data.overlayDockMode = DockMode::BottomRight;
 		else data.overlayDockMode = DockMode::None;
+
+		data.overlayTransparency = plugin.GetSettingBool("general", "overlay_transparency", true);
 	}
 
 	void Save() {
@@ -60,6 +63,7 @@ public:
 		plugin.SetSettingBool("general", "external_window_on_top", data.externalWindowOnTop);
 		plugin.SetSettingBool("general", "overlay", data.inGameOverlay);
 		plugin.SetSettingBool("general", "overlay_detailed", data.inGameOverlayDetailed);
+		plugin.SetSettingBool("general", "overlay_transparency", data.overlayTransparency);
 		plugin.SetSettingBool("livesplit", "enabled", data.liveSplitEnabled);
 		plugin.SetSetting("livesplit", "ip", data.liveSplitIP);
 		plugin.SetSettingInt("livesplit", "port", data.liveSplitPort);

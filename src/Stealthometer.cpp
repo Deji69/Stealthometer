@@ -319,6 +319,11 @@ auto Stealthometer::DrawSettingsUI(bool focused) -> void {
 			ImGui::EndCombo();
 		}
 
+		
+		if (ImGui::Checkbox("Transparent Overlay", &cfg.overlayTransparency)) {
+			config.Save();
+		}
+
 		if (ImGui::Checkbox("External Window", &cfg.externalWindow)) {
 			if (cfg.externalWindow) this->window.create(hInstance);
 			else this->window.destroy();
@@ -359,6 +364,9 @@ auto Stealthometer::DrawOverlayUI(bool focused) -> void
 
 	if (cfg.overlayDockMode != DockMode::None || !focused)
 		flags |= ImGuiWindowFlags_NoTitleBar;
+
+	if (cfg.overlayTransparency)
+		flags |= ImGuiWindowFlags_NoBackground;
 
 	switch (cfg.overlayDockMode) {
 		case DockMode::TopLeft:
