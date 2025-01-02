@@ -19,7 +19,7 @@ jobs:
       uses: lukka/get-cmake@latest
 
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
       with:
         submodules: recursive
 
@@ -53,13 +53,13 @@ jobs:
         Copy-Item LICENSE -Destination _dist-release/LICENSE
 
     - name: Archive debug
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: MyMod-Debug
         path: _dist-debug/*
 
     - name: Archive release
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: MyMod-Release
         path: _dist-release/*
@@ -72,13 +72,13 @@ jobs:
 
     steps:
     - name: Download debug artifact
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v4
       with:
         name: MyMod-Debug
         path: MyMod-Debug
 
     - name: Download release artifact
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v4
       with:
         name: MyMod-Release
         path: MyMod-Release
