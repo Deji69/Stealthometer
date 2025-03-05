@@ -4,7 +4,7 @@ project(Stealthometer CXX)
 
 # Find latest version at https://github.com/OrfeasZ/ZHMModSDK/releases
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
-set(ZHMMODSDK_VER "v2.0.0")
+set(ZHMMODSDK_VER "v3.1.1")
 include(cmake/setup-zhmmodsdk.cmake)
 
 # Download CMakeRC resource compiler
@@ -16,7 +16,10 @@ include("${CMAKE_BINARY_DIR}/CMakeRC.cmake")
 set(CMAKE_CXX_STANDARD 23)
 
 #create_resources("data" "src/resources.c")
-cmrc_add_resource_library(stealthometer-resources NAMESPACE stealthometer ALIAS stealthometer::rc "data/repo.json")
+cmrc_add_resource_library(stealthometer-resources NAMESPACE stealthometer ALIAS stealthometer::rc "data/repo.json" "data/npc.json")
+
+add_compile_options("$<$<C_COMPILER_ID:MSVC>:/utf-8>")
+add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
 
 # Create the Stealthometer mod library.
 add_library(Stealthometer SHARED

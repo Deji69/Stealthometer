@@ -249,6 +249,13 @@ struct Stats
 	double currentTrespassTime = 0;
 	double weaponHoldingStartTime = 0;
 	std::vector<WitnessEvent> witnessEvents;
+	std::string firstSpottedByID;
+	std::string firstSpottedByName;
+	std::string firstBodyFoundByID;
+	std::string firstBodyFoundByName;
+	std::string firstNTKID;
+	std::string firstNTKName;
+	bool firstBodyFoundWasByTarget = false;
 	std::set<std::string, InsensitiveCompareLexicographic> witnesses;
 	std::set<std::string, InsensitiveCompareLexicographic> spottedBy;
 	std::set<std::string, InsensitiveCompareLexicographic> targetsSpottedBy;

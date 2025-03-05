@@ -59,6 +59,7 @@ private:
 	auto AddObtainedItem(const std::string& id, ItemInfo item) -> void;
 	auto RemoveObtainedItem(const std::string& id) -> int;
 	auto AddDisposedItem(const std::string& id, ItemInfo item) -> void;
+	auto GetNPCName(const std::string& id) -> const std::string*;
 
 private:
 	//DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZGameStatsManager_SendAISignals, ZGameStatsManager* th);
@@ -78,6 +79,7 @@ private:
 	std::vector<std::string> eventHistory;
 	std::mt19937 randomGenerator;
 	std::unordered_map<std::string, nlohmann::json, StringHashLowercase, InsensitiveCompare> repo;
+	std::unordered_map<std::string, std::string, StringHashLowercase, InsensitiveCompare> npcNames;
 
 	RunData runData;
 	FreelancerRunData freelancer;

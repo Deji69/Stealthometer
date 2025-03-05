@@ -65,7 +65,8 @@ auto Stealthometer::Init() -> void
 
 	auto const fs = cmrc::stealthometer::get_filesystem();
 
-	if (!fs.is_file("data/repo.json"))
+	if (!fs.is_file("data/repo.json")
+		|| !fs.is_file("data/npc.json"))
 		Logger::Error("Stealthometer: repo.json not found in embedded filesystem.");
 	else {
 		auto file = fs.open("data/repo.json");
@@ -80,6 +81,22 @@ auto Stealthometer::Init() -> void
 			}
 		}
 		else Logger::Error("Stealthometer: repo.json invalid.");
+	}
+	if (fs.is_file("data/npc.json")) {
+		auto file = fs.open("data/npc.json");
+		auto repo = nlohmann::json::parse(file.begin(), file.end());
+
+		if (repo.is_array()) {
+			for (auto const& entry : repo) {
+				if (!entry.is_object()) continue;
+				auto id = entry.find("ID_");
+				if (id == entry.end()) continue;
+				auto name = entry.find("Name");
+				if (name == entry.end()) continue;
+				this->npcNames.emplace(id.value().get<std::string>(), name.value().get<std::string>());
+			}
+		}
+		else Logger::Error("Stealthometer: npc.json invalid.");
 	}
 	//this->window.create(hInstance);
 }
@@ -141,6 +158,14 @@ auto Stealthometer::GetRepoEntry(const std::string& id) -> const nlohmann::json*
 	if (!id.empty()) {
 		auto it = this->repo.find(id);
 		if (it != this->repo.end()) return &it->second;
+	}
+	return nullptr;
+}
+
+auto Stealthometer::GetNPCName(const std::string& id) -> const std::string* {
+	if (!id.empty()) {
+		auto it = this->npcNames.find(id);
+		if (it != this->npcNames.end()) return &it->second;
 	}
 	return nullptr;
 }
@@ -253,6 +278,8 @@ auto Stealthometer::OnDrawMenu() -> void {
 }
 
 auto Stealthometer::DrawSettingsUI(bool focused) -> void {
+	if (!focused) return;
+
 	ImGui::PushFont(SDK()->GetImGuiBlackFont());
 
 	ImGui::SetNextWindowSizeConstraints(ImVec2{100, 300}, ImVec2{500, 500});
@@ -261,12 +288,11 @@ auto Stealthometer::DrawSettingsUI(bool focused) -> void {
 		ImGui::PushFont(SDK()->GetImGuiRegularFont());
 		auto& cfg = config.Get();
 
-		if (ImGui::Button("Overlay")) {
-			cfg.inGameOverlay = true;
+		if (ImGui::Checkbox("Overlay", &cfg.inGameOverlay)) {
 			config.Save();
 		}
 
-		ImGui::SameLine(100.0);
+		ImGui::SameLine(120.0);
 
 		auto selectedOverlayDockName = "Undocked";
 
@@ -282,6 +308,9 @@ auto Stealthometer::DrawSettingsUI(bool focused) -> void {
 				break;
 			case DockMode::BottomRight:
 				selectedOverlayDockName = "Bottom Right";
+				break;
+			case DockMode::BelowMinimap:
+				selectedOverlayDockName = "Below Minimap";
 				break;
 		}
 
@@ -316,11 +345,54 @@ auto Stealthometer::DrawSettingsUI(bool focused) -> void {
 			}
 			if (cfg.overlayDockMode == DockMode::BottomRight) ImGui::SetItemDefaultFocus();
 
+			if (ImGui::Selectable("Above Minimap", cfg.overlayDockMode == DockMode::AboveMinimap, 0)) {
+				cfg.overlayDockMode = DockMode::AboveMinimap;
+				this->config.Save();
+			}
+			if (cfg.overlayDockMode == DockMode::AboveMinimap) ImGui::SetItemDefaultFocus();
+
+			if (ImGui::Selectable("Below Minimap", cfg.overlayDockMode == DockMode::BelowMinimap, 0)) {
+				cfg.overlayDockMode = DockMode::BelowMinimap;
+				this->config.Save();
+			}
+			if (cfg.overlayDockMode == DockMode::BelowMinimap) ImGui::SetItemDefaultFocus();
+
+			ImGui::EndCombo();
+		}
+
+		auto selectedDetailName = "Normal";
+
+		switch (cfg.overlayDetail) {
+			case OverlayDetailMode::Normal:
+				selectedDetailName = "Normal";
+				break;
+			case OverlayDetailMode::WithNames:
+				selectedDetailName = "With NPC Names";
+				break;
+		}
+
+		if (ImGui::BeginCombo("##OverlayDetail", selectedDetailName, ImGuiComboFlags_HeightLarge)) {
+			if (ImGui::Selectable("Normal", cfg.overlayDetail == OverlayDetailMode::Normal, 0)) {
+				cfg.overlayDetail = OverlayDetailMode::Normal;
+				this->config.Save();
+			}
+			if (cfg.overlayDetail == OverlayDetailMode::Normal) ImGui::SetItemDefaultFocus();
+
+			if (ImGui::Selectable("With NPC Names", cfg.overlayDetail == OverlayDetailMode::WithNames, 0)) {
+				cfg.overlayDetail = OverlayDetailMode::WithNames;
+				this->config.Save();
+			}
+			if (cfg.overlayDetail == OverlayDetailMode::WithNames) ImGui::SetItemDefaultFocus();
+
 			ImGui::EndCombo();
 		}
 
 		
 		if (ImGui::Checkbox("Transparent Overlay", &cfg.overlayTransparency)) {
+			config.Save();
+		}
+		
+		if (ImGui::Checkbox("Use Shorthand", &cfg.useExtendedShorthand)) {
 			config.Save();
 		}
 
@@ -381,6 +453,15 @@ auto Stealthometer::DrawOverlayUI(bool focused) -> void
 		case DockMode::BottomRight:
 			ImGui::SetNextWindowPos({viewportSize.x - this->overlaySize.x, viewportSize.y - this->overlaySize.y});
 			break;
+		case DockMode::AboveMinimap:
+			ImGui::SetNextWindowPos({ 34, viewportSize.y - this->overlaySize.y - 240 });
+			break;
+		case DockMode::BelowMinimap:
+			ImGui::SetNextWindowPos({ 34, viewportSize.y - this->overlaySize.y + 11 });
+			break;
+		case DockMode::LeftBelowMinimap:
+			ImGui::SetNextWindowPos({ 0, viewportSize.y - this->overlaySize.y + 11 });
+			break;
 	}
 
 	ImGui::PushFont(SDK()->GetImGuiBlackFont());
@@ -401,7 +482,13 @@ auto Stealthometer::DrawOverlayUI(bool focused) -> void
 		}
 		else if (this->displayStats.silentAssassin == SilentAssassinStatus::RedeemableTarget) {
 			ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(217, 109, 0, 255));
-			ImGui::Text("Target");
+			if (!this->stats.firstSpottedByName.empty()) {
+				ImGui::Text(this->stats.firstSpottedByName.c_str());
+			}
+			else if (!this->stats.firstBodyFoundByName.empty()) {
+				ImGui::Text(this->stats.firstBodyFoundByName.c_str());
+			}
+			else ImGui::Text("Target");
 			ImGui::PopStyleColor();
 		}
 		else if (this->displayStats.silentAssassin == SilentAssassinStatus::RedeemableCameraAndTarget) {
@@ -411,13 +498,26 @@ auto Stealthometer::DrawOverlayUI(bool focused) -> void
 		}
 		else {
 			std::string str;
+			auto enableNames = cfg.overlayDetail == OverlayDetailMode::WithNames;
 
-			if (this->displayStats.spotted > 0)
+			if (this->stats.detection.nonTargetsSpottedBy > 0) {
 				str += "Spotted";
-			if (this->displayStats.bodiesFound > 0)
+				if (enableNames && !this->stats.firstSpottedByName.empty() && this->stats.firstSpottedByName != this->stats.firstBodyFoundByName) {
+					str += " by " + this->stats.firstSpottedByName;
+				}
+			}
+			if (this->stats.bodies.foundMurderedByNonTarget > 0) {
 				str += (str.empty() ? ""s : " | "s) + "Body Found"s;
-			if (this->displayStats.civilianKills > 0 || this->displayStats.guardKills > 0)
-				str += (str.empty() ? ""s : " | "s) + "Non-Target Kill"s;
+				if (enableNames && !this->stats.firstBodyFoundByName.empty()) {
+					str += " by " + this->stats.firstBodyFoundByName;
+				}
+			}
+			if (this->displayStats.civilianKills > 0 || this->displayStats.guardKills > 0) {
+				str += (str.empty() ? ""s : " | "s) + (cfg.useExtendedShorthand ? "NTK"s : "Non-Target Kill"s);
+				if (enableNames && !this->stats.firstNTKName.empty()) {
+					str += " of " + this->stats.firstNTKName;
+				}
+			}
 
 			ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
 			ImGui::Text(str.c_str());
@@ -938,6 +1038,16 @@ auto Stealthometer::SetupEvents() -> void {
 			else if (!foundMurderedInfoIt->second.isSightedByNonTarget) {
 				foundMurderedInfoIt->second.isSightedByNonTarget = true;
 				++stats.bodies.foundMurderedByNonTarget;
+
+				// Get name of first NPC to find a body, replace target name with non target name
+				if (stats.firstBodyFoundByID.empty() && stats.firstBodyFoundWasByTarget) {
+					auto name = this->GetNPCName(ev.witnessId);
+					if (name) {
+						stats.firstBodyFoundByID = ev.witnessId;
+						stats.firstBodyFoundByName = *name;
+						stats.firstBodyFoundWasByTarget = ev.isWitnessTarget;
+					}
+				}
 			}
 
 			foundMurderedInfoIt->second.sightings.try_emplace(ev.witnessId, ev.isWitnessTarget);
@@ -959,6 +1069,16 @@ auto Stealthometer::SetupEvents() -> void {
 			stats.targetBodyWitnesses.emplace(ev.witnessId);
 		else
 			++stats.bodies.foundMurderedByNonTarget;
+
+		// Get name of first NPC to find a body
+		if (stats.firstBodyFoundByID.empty()) {
+			auto name = this->GetNPCName(ev.witnessId);
+			if (name) {
+				stats.firstBodyFoundByID = ev.witnessId;
+				stats.firstBodyFoundByName = *name;
+				stats.firstBodyFoundWasByTarget = ev.isWitnessTarget;
+			}
+		}
 
 		BodyStats::MurderedBodyFoundInfo bodyFoundInfo;
 		bodyFoundInfo.sightings.emplace(ev.witnessId, ev.isWitnessTarget);
@@ -1238,6 +1358,14 @@ auto Stealthometer::SetupEvents() -> void {
 			if (!stats.spottedBy.contains(name)) {
 				Logger::Info("Stealthometer: spotted by {} - Target: {}", name, isTarget);
 
+				if (stats.firstSpottedByName.empty()) {
+					auto realName = this->GetNPCName(name);
+					if (realName) {
+						stats.firstSpottedByID = name;
+						stats.firstSpottedByName = *realName;
+					}
+				}
+
 				++stats.detection.spotted;
 				stats.spottedBy.insert(name);
 
@@ -1410,6 +1538,15 @@ auto Stealthometer::SetupEvents() -> void {
 		stats.bodies.allHidden = false;
 		++stats.kills.total;
 
+		if (repoId == stats.firstSpottedByID) {
+			stats.firstSpottedByID = "";
+			stats.firstSpottedByName = "";
+		}
+		if (repoId == stats.firstBodyFoundByID) {
+			stats.firstBodyFoundByID = "";
+			stats.firstBodyFoundByName = "";
+		}
+
 		if (isTarget) {
 			auto res = stats.kills.targets.emplace(repoId);
 			if (res.second) {
@@ -1437,6 +1574,14 @@ auto Stealthometer::SetupEvents() -> void {
 
 				if (stats.spottedBy.count(repoId))
 					++stats.detection.uniqueNPCsCaughtByAndKilled;
+			}
+
+			if (stats.firstNTKName.empty() && stats.firstNTKID != repoId) {
+				stats.firstNTKID = repoId;
+				auto name = this->GetNPCName(repoId);
+				if (name) {
+					stats.firstNTKName = *name;
+				}
 			}
 		}
 

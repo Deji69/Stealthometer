@@ -21,8 +21,7 @@
 				},
 				"VCPKG_TARGET_TRIPLET": "x64-windows-static",
 				"VCPKG_HOST_TRIPLET": "x64-windows-static",
-				"CMAKE_POLICY_DEFAULT_CMP0091": "NEW",
-				"ZHMMODSDK_DIR": "U:/Dev/project/hitman-tools/ZHMModSDK"
+				"CMAKE_POLICY_DEFAULT_CMP0091": "NEW"
 			},
 			"toolset": {
 				"value": "host=x64",
