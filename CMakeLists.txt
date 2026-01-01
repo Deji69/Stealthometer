@@ -4,12 +4,13 @@ project(Stealthometer CXX)
 
 # Find latest version at https://github.com/OrfeasZ/ZHMModSDK/releases
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
-set(ZHMMODSDK_VER "v4.0.0")
+set(ZHMMODSDK_VER "v4.0.0-rc.2")
 include(cmake/setup-zhmmodsdk.cmake)
 
 # Download CMakeRC resource compiler
 file(DOWNLOAD "https://raw.githubusercontent.com/vector-of-bool/cmrc/master/CMakeRC.cmake"
-                 "${CMAKE_BINARY_DIR}/CMakeRC.cmake")
+	"${CMAKE_BINARY_DIR}/CMakeRC.cmake"
+)
 include("${CMAKE_BINARY_DIR}/CMakeRC.cmake")
 
 # Set C++ standard to C++23.

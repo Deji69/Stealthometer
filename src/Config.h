@@ -113,7 +113,7 @@ public:
 			spinOverlayDock = "leftbelowmap";
 			break;
 		}
-		plugin.SetSetting("general", "overlay_dock", spinOverlayDock);
+		plugin.SetSetting("general", "overlay_dock", std::string_view{spinOverlayDock});
 
 		auto overlayDetail = "normal";
 		switch (data.overlayDetail) {
@@ -121,7 +121,7 @@ public:
 				overlayDetail = "names";
 				break;
 		}
-		plugin.SetSetting("general", "overlay_detail", overlayDetail);
+		plugin.SetSetting("general", "overlay_detail", std::string_view{overlayDetail});
 	}
 
 	inline ConfigData& Get() { return data; }
