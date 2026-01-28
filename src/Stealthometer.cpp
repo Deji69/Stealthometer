@@ -1,32 +1,50 @@
-#include <Windows.h>
-#include <functional>
-#include <ranges>
-#include <thread>
-#include <Hooks.h>
-#include <Logging.h>
-#include <Functions.h>
-#include <Glacier/EntityFactory.h>
-#include <Glacier/SGameUpdateEvent.h>
-#include <Glacier/SOnlineEvent.h>
-#include <Glacier/ZAIGameState.h>
-#include <Glacier/ZActor.h>
-#include <Glacier/ZGameLoopManager.h>
-#include <Glacier/ZKnowledge.h>
-#include <Glacier/ZModule.h>
-#include <Glacier/ZSpatialEntity.h>
-#include <Glacier/ZScene.h>
-#include <IconsMaterialDesign.h>
-#include <cmrc/cmrc.hpp>
-#include <imgui.h>
-#include "deps/imgui/imgui_stdlib.h"
-
-#include "Stealthometer.h"
+#include "Config.h"
 #include "Enums.h"
 #include "Events.h"
+#include "EventSystem.h"
+#include "json.hpp"
+#include "LiveSplitClient.h"
 #include "Rating.h"
 #include "Stats.h"
-#include "json.hpp"
-#include "FixMinMax.h"
+#include "Stealthometer.h"
+#include "util.h"
+#include <algorithm>
+#include <charconv>
+#include <cmrc/cmrc.hpp>
+#include <Common.h>
+#include <cstddef>
+#include <cstdint>
+#include <format>
+#include <functional>
+#include <Functions.h>
+#include <Glacier/Enums.h>
+#include <Glacier/EUpdateMode.h>
+#include <Glacier/SGameUpdateEvent.h>
+#include <Glacier/ZActor.h>
+#include <Glacier/ZDelegate.h>
+#include <Glacier/ZGameLoopManager.h>
+#include <Glacier/ZKnowledge.h>
+#include <Glacier/ZObject.h>
+#include <Glacier/ZRender.h>
+#include <Glacier/ZRepository.h>
+#include <Glacier/ZSpatialEntity.h>
+#include <Glacier/ZString.h>
+#include <Globals.h>
+#include <Hook.h>
+#include <Hooks.h>
+#include <IconsMaterialDesign.h>
+#include <imgui.h>
+#include <IModSDK.h>
+#include <IPluginInterface.h>
+#include <iterator>
+#include <Logging.h>
+#include <random>
+#include <ranges>
+#include <string>
+#include <string_view>
+#include <system_error>
+#include <utility>
+#include <Windows.h>
 
 using namespace std::string_literals;
 
@@ -176,15 +194,15 @@ auto Stealthometer::OnFrameUpdateAlways(const SGameUpdateEvent& ev) -> void {
 
 auto Stealthometer::OnFrameUpdatePlayMode(const SGameUpdateEvent& ev) -> void {
 	for (int i = 0; i < *Globals::NextActorId; ++i) {
-		const auto& actor = Globals::ActorManager->m_aActiveActors[i];
-		const auto actorSpatial = actor.m_ref.QueryInterface<ZSpatialEntity>();
+		const auto& actor = Globals::ActorManager->m_activatedActors[i];
+		const auto actorSpatial = actor.m_entityRef.QueryInterface<ZSpatialEntity>();
 		auto& actorData = this->actorData[i];
 
 		if (!actorData.ref) {
 			actorData.ref = &actor;
-			auto repoEntity = actor.m_ref.QueryInterface<ZRepositoryItemEntity>();
+			auto repoEntity = actor.m_entityRef.QueryInterface<ZRepositoryItemEntity>();
 			actorData.repoId = repoEntity->m_sId.ToString();
-			actorData.isTarget = actor.m_pInterfaceRef->m_bUnk16;
+			actorData.isTarget = actor.m_pInterfaceRef->m_bContractTarget;
 		}
 
 		if (!actorSpatial)
@@ -193,12 +211,12 @@ auto Stealthometer::OnFrameUpdatePlayMode(const SGameUpdateEvent& ev) -> void {
 		if (i > this->npcCount)
 			this->npcCount = i;
 
-		if (actor.m_pInterfaceRef->m_nCurrentBehaviorIndex >= 0) {
+		if (actor.m_pInterfaceRef->m_nActorRuntimeId >= 0) {
 			// (&behaviour + 0xD8) = m_pPreviousBehavior ?
 
-			auto& behaviour = Globals::BehaviorService->m_aKnowledgeData[actor.m_pInterfaceRef->m_nCurrentBehaviorIndex];
+			auto& behaviour = Globals::BehaviorService->m_aBehaviorStates[actor.m_pInterfaceRef->m_nActorRuntimeId];
 			if (!behaviour.m_pCurrentBehavior) continue;
-			auto behaviourType = static_cast<ECompiledBehaviorType>(behaviour.m_pCurrentBehavior->m_Type);
+			auto behaviourType = behaviour.m_pCurrentBehavior->eBehaviorType;
 			auto lastBehaviourType = actorData.lastFrameBehaviour;
 			actorData.lastFrameBehaviour = behaviourType;
 
@@ -556,18 +574,24 @@ auto Stealthometer::DrawLiveSplitUI(bool focused) -> void
 			else if (cfg.liveSplitEnabled && !liveSplitClient.isStarted())
 				liveSplitClient.start();
 		}
-		if (ImGui::InputText("IP", &cfg.liveSplitIP)) {
+
+		static char liveSplitIPBuff[40] = "\0";
+		std::copy(cfg.liveSplitIP.begin(), cfg.liveSplitIP.end(), liveSplitIPBuff);
+
+		if (ImGui::InputText("IP", liveSplitIPBuff, sizeof(liveSplitIPBuff))) {
+			cfg.liveSplitIP = liveSplitIPBuff;
 			auto res = cfg.liveSplitIP.empty() ? INADDR_NONE : inet_addr(cfg.liveSplitIP.c_str());
 			if (res == INADDR_NONE)
 				cfg.liveSplitIP = "127.0.0.1";
 			config.Save();
 		}
-		static std::string portInput;
-		portInput = std::format("{}", cfg.liveSplitPort);
-		if (ImGui::InputText("Port", &portInput)) {
-			if (portInput.size() > 5) portInput.clear();
+
+		static char portInput[6] = "\0";
+		std::format_to(portInput, "{}", cfg.liveSplitPort);
+
+		if (ImGui::InputText("Port", portInput, sizeof(portInput))) {
 			uint16_t port = 16834;
-			auto res = !portInput.empty() ? std::from_chars(portInput.c_str(), portInput.c_str() + portInput.size(), port).ec : std::errc{};
+			auto res = !*portInput ? std::from_chars(portInput, portInput + sizeof(portInput), port).ec : std::errc {};
 			if (res != std::errc{})
 				port = 16834;
 			cfg.liveSplitPort = port;
@@ -1742,7 +1766,7 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void*, OnLoadingScreenActivated, void* th, v
 
 DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent, ZAchievementManagerSimple* th, uint32_t eventId, const ZDynamicObject& ev) {
 	ZString eventData;
-	Functions::ZDynamicObject_ToString->Call(const_cast<ZDynamicObject*>(&ev), &eventData);
+	Functions::ZDynamicObject_ToString->Call(const_cast<ZDynamicObject*>(&ev), eventData);
 
 	auto eventDataSV = std::string_view(eventData.c_str(), eventData.size());
 	auto fixedEventDataStr = std::string(eventData.size(), '\0');

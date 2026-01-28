@@ -1,14 +1,15 @@
 #pragma once
 #include <atomic>
 #include <deque>
-#include <mutex>
 #include <shared_mutex>
 #include <string>
 #include <thread>
-#include <vector>
-#include <Windows.h>
 
 struct ConfigData;
+
+// ugh...
+typedef UINT_PTR SOCKET;
+#define INVALID_SOCKET  (SOCKET)(~0)
 
 enum class eClientMessage
 {

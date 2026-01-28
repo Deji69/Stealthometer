@@ -4,7 +4,7 @@ project(Stealthometer CXX)
 
 # Find latest version at https://github.com/OrfeasZ/ZHMModSDK/releases
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
-set(ZHMMODSDK_VER "v4.0.0-rc.2")
+set(ZHMMODSDK_VER "v4.0.0-rc.3")
 include(cmake/setup-zhmmodsdk.cmake)
 
 # Download CMakeRC resource compiler
@@ -41,6 +41,7 @@ target_link_libraries(Stealthometer PRIVATE
 	stealthometer::rc
 	Microsoft::DirectX-Guids
 	Microsoft::DirectX-Headers
+	implot
 )
 
 install(TARGETS Stealthometer
