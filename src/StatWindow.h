@@ -1,7 +1,8 @@
 #pragma once
+#include <Windows.h>
+#include "FixMinMax.h"
 #include <string>
 #include <thread>
-#include <Windows.h>
 #include "Stats.h"
 
 #define STEALTHOMETER_UPDATE_WINDOW (WM_USER + 0x01)

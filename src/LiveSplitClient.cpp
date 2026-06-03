@@ -4,6 +4,7 @@
 #include <map>
 #include <shared_mutex>
 #include <WS2tcpip.h>
+#include "FixMinMax.h"
 #include <Logging.h>
 #include "Config.h"
 #include "LiveSplitClient.h"
