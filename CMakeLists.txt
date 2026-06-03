@@ -4,7 +4,7 @@ project(Stealthometer CXX)
 
 # Find latest version at https://github.com/OrfeasZ/ZHMModSDK/releases
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
-set(ZHMMODSDK_VER "v4.0.0-rc.3")
+set(ZHMMODSDK_VER "v4.0.2")
 include(cmake/setup-zhmmodsdk.cmake)
 
 # Download CMakeRC resource compiler
