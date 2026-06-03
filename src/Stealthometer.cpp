@@ -21,6 +21,7 @@
 #include <Glacier/EUpdateMode.h>
 #include <Glacier/SGameUpdateEvent.h>
 #include <Glacier/ZActor.h>
+#include <Glacier/ZBehavior.h>
 #include <Glacier/ZDelegate.h>
 #include <Glacier/ZGameLoopManager.h>
 #include <Glacier/ZKnowledge.h>
@@ -45,6 +46,7 @@
 #include <system_error>
 #include <utility>
 #include <Windows.h>
+#include <WinSock2.h>
 
 using namespace std::string_literals;
 
