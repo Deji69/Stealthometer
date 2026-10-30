@@ -642,7 +642,7 @@ auto Stealthometer::DrawExpandedStatsUI(bool focused) -> void {
 				if (ImGui::BeginTable("KillStatsTableL", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_Borders)) {
 					ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, 30);
 					printRow("Guard", "%d", stats.kills.guard);
-					printRow("Target", "%d", stats.kills.targets);
+					printRow("Target", "%d", stats.kills.targets.size());
 					printRow("Unnoticed", "%d", stats.kills.unnoticed);
 					printRow("Unnoticed Non-Target", "%d", stats.kills.unnoticedNonTarget);
 				}
@@ -656,7 +656,7 @@ auto Stealthometer::DrawExpandedStatsUI(bool focused) -> void {
 				if (ImGui::BeginTable("KillStatsTableR", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_Borders)) {
 					ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, 30);
 					printRow("Civilian", "%d", stats.kills.civilian);
-					printRow("Non-Target", "%d", stats.kills.nonTargets);
+					printRow("Non-Target", "%d", stats.kills.nonTargets.size());
 					printRow("Noticed", "%d", stats.kills.noticed);
 				}
 				ImGui::EndTable();
